@@ -15,7 +15,7 @@ class SourceConfig(BaseModel):
     name: str
     url: str
     path: str | None = None
-    fetcher: Literal["StealthyFetcher", "DynamicFetcher"] = "StealthyFetcher"
+    fetcher: Literal["Fetcher", "StealthyFetcher", "DynamicFetcher"] = "Fetcher"
     schedule: str | None = None
     download_delay_sec: float = Field(default=2.0, ge=0)
     concurrent_requests: int = Field(default=1, ge=1)

@@ -29,5 +29,5 @@ class TestFetcherSelector:
         try:
             FetcherSelector.for_source("test", "StealthyFetcher")
         except ImportError as e:
-            assert "scrapling dependencies missing" in str(e)
+            assert "scrapling" in str(e).lower()
             assert "uv sync" in str(e)

@@ -10,38 +10,33 @@ class FetcherSelector:
         self._user_agent = user_agent or "korean-rental-etl/0.1.0"
 
     @staticmethod
-    def for_source(source_name: str, fetcher_type: str = "StealthyFetcher") -> object:
-        """Return a Scrapling fetcher instance configured for the given source.
+    def for_source(source_name: str, fetcher_type: str = "Fetcher") -> object:
+        """Return a Scrapling fetcher class for the given source.
 
         Args:
             source_name: Name of the source (for logging/context).
-            fetcher_type: Either 'StealthyFetcher' or 'DynamicFetcher'.
+            fetcher_type: One of 'Fetcher', 'StealthyFetcher', or 'DynamicFetcher'.
 
         Returns:
-            Configured fetcher instance.
+            Scrapling fetcher class (not instance).
 
         Raises:
             ValueError: If fetcher_type is unknown.
-            ImportError: If scrapling or its dependencies are not available.
+            ImportError: If scrapling is not available.
         """
-        if fetcher_type not in ("StealthyFetcher", "DynamicFetcher"):
+        if fetcher_type not in ("Fetcher", "StealthyFetcher", "DynamicFetcher"):
             raise ValueError(f"Unknown fetcher type: {fetcher_type}")
 
         try:
-            from scrapling import DynamicFetcher, StealthyFetcher
+            from scrapling import DynamicFetcher, Fetcher, StealthyFetcher
         except (ImportError, ModuleNotFoundError) as e:
             raise ImportError(
-                f"scrapling dependencies missing: {e}. "
-                "Install with: uv sync (may require system deps like curl_cffi)"
+                f"scrapling not available: {e}. Install with: uv sync"
             ) from e
 
-        if fetcher_type == "StealthyFetcher":
-            return StealthyFetcher(  # type: ignore[no-untyped-call]
-                auto_match=False,
-                headless=True,
-            )
+        if fetcher_type == "Fetcher":
+            return Fetcher  # type: ignore[return-value]
+        elif fetcher_type == "StealthyFetcher":
+            return StealthyFetcher  # type: ignore[return-value]
         else:
-            return DynamicFetcher(  # type: ignore[no-untyped-call]
-                auto_match=False,
-                headless=True,
-            )
+            return DynamicFetcher  # type: ignore[return-value]

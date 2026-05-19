@@ -38,7 +38,7 @@ class TestSourceConfig:
 
     def test_default_values(self) -> None:
         cfg = SourceConfig(name="test", url="https://example.com")
-        assert cfg.fetcher == "StealthyFetcher"
+        assert cfg.fetcher == "Fetcher"
         assert cfg.download_delay_sec == 2.0
         assert cfg.concurrent_requests == 1
         assert cfg.robots_txt_obey is True

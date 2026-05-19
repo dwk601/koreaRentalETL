@@ -5,7 +5,7 @@ sources:
   - name: svkoreans
     url: "https://svkoreans.com/rent_housing"
     path: null
-    fetcher: StealthyFetcher
+    fetcher: Fetcher
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
@@ -16,7 +16,7 @@ sources:
   - name: gtksa
     url: "https://gtksa.net"
     path: "bbs/board.php?bo_table=rent"
-    fetcher: StealthyFetcher
+    fetcher: Fetcher
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
@@ -28,7 +28,7 @@ sources:
     url: "https://missyusa.com"
     path: "town9"
     fetcher: StealthyFetcher
-    schedule: "0 */6 * * *"
+    schedule: "0 */4 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
     robots_txt_obey: true
@@ -38,8 +38,8 @@ sources:
   - name: ktown_koreadaily
     url: "https://ktown.koreadaily.com"
     path: "ad_rent/rentlist"
-    fetcher: StealthyFetcher
-    schedule: "0 */6 * * *"
+    fetcher: Fetcher
+    schedule: "0 */8 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
     robots_txt_obey: true
@@ -60,7 +60,7 @@ sources:
   - name: hanintown
     url: "https://hanintown.com"
     path: null
-    fetcher: StealthyFetcher
+    fetcher: Fetcher
     schedule: null
     download_delay_sec: 2.0
     concurrent_requests: 1
