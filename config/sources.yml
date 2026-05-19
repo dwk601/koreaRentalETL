@@ -1,0 +1,69 @@
+# Korean Rental ETL - Source Configuration
+# Each source defines a community board to scrape
+
+sources:
+  - name: svkoreans
+    url: "https://svkoreans.com/rent_housing"
+    path: null
+    fetcher: StealthyFetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: active
+    description: "SV Korean community rental board"
+
+  - name: gtksa
+    url: "https://gtksa.net"
+    path: "bbs/board.php?bo_table=rent"
+    fetcher: StealthyFetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: active
+    description: "GTKSA rental board"
+
+  - name: missyusa
+    url: "https://missyusa.com"
+    path: "town9"
+    fetcher: StealthyFetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: active
+    description: "MissyUSA town9 rental section"
+
+  - name: ktown_koreadaily
+    url: "https://ktown.koreadaily.com"
+    path: "ad_rent/rentlist"
+    fetcher: StealthyFetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: active
+    description: "Korea Daily K-Town rental listings"
+
+  - name: radiokorea
+    url: "https://m.radiokorea.com"
+    path: "c_realestate"
+    fetcher: DynamicFetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: active
+    description: "Radio Korea real estate (mobile, JS-rendered)"
+
+  - name: hanintown
+    url: "https://hanintown.com"
+    path: null
+    fetcher: StealthyFetcher
+    schedule: null
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    robots_txt_obey: true
+    status: disabled
+    description: "Hanin Town (disabled placeholder)"

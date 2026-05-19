@@ -1,0 +1,324 @@
+{
+  "system_name": "KoreanRentalETL",
+  "problem_statement": "Build a 6-hourly ETL pipeline that scrapes rental listings from five Korean-language community boards (svkoreans, gtksa, missyusa/town9, ktown.koreadaily, m.radiokorea; hanintown disabled placeholder), normalizes Korean price/date/location formats into a bilingual schema, deduplicates listings across sources, and loads them into Postgres. Solo-dev Docker Compose deployment, conservative scraping posture, test-driven.",
+  "requirements": {
+    "scope_strategy": "vertical_slice_per_phase",
+    "geocoding": {
+      "primary": "Nominatim",
+      "coverage": "US + Korea",
+      "future": ["Kakao Map", "Naver Map"]
+    },
+    "localization": {
+      "storage": "bilingual (Korean raw + English normalized)",
+      "category_labels": "english_only"
+    },
+    "ops": {
+      "deployment": "docker_compose_single_host",
+      "secrets": ".env file",
+      "notifications": "email_via_smtp",
+      "proxy": false,
+      "logging": "console + file"
+    },
+    "scraping_politeness": {
+      "robots_txt_obey": true,
+      "download_delay_sec": 2.0,
+      "concurrent_requests": 2,
+      "retries": {"max": 3, "strategy": "exponential_backoff"},
+      "ban_detection": ["HTTP 403", "HTTP 429", "Cloudflare challenge"]
+    },
+    "lifecycle": {
+      "stale_window_days": 14,
+      "stale_action": "set is_active=false (do not delete)",
+      "raw_html_retention_days": 90,
+      "pii_handling": "plaintext",
+      "idempotency": "ON CONFLICT (source_id, source_listing_id) DO UPDATE"
+    },
+    "tooling": {
+      "python": "3.11",
+      "package_manager": "uv",
+      "linter_formatter": "ruff",
+      "type_checker": "mypy --strict",
+      "test_runner": "pytest",
+      "test_strategy": [
+        "unit tests with stored HTML fixtures per source",
+        "integration tests against ephemeral postgres+redis via docker-compose.test.yml",
+        "DAG-import smoke tests via `airflow dags test`"
+      ],
+      "coverage_target": "≥80% on transform/"
+    },
+    "crawl_policy": {
+      "list_pages": "always",
+      "detail_pages": "only when URL is new (Redis miss) OR content hash differs"
+    },
+    "validation_rules": [
+      "parsed_rows >= 0.5 * avg(last_5_runs)",
+      "null_rate(price|location|title) <= 0.20",
+      "foreign key integrity (listings.source_id -> sources.id)"
+    ],
+    "fuzzy_dedup": {
+      "library": "RapidFuzz",
+      "threshold": 0.90,
+      "fields": ["title", "price", "city"],
+      "time_window_days": 7
+    },
+    "categories": [
+      "apartment", "house", "condo", "room_share", "sublet",
+      "roommate_wanted", "commercial_space", "parking", "other"
+    ],
+    "category_strategy": "rule_based KO+EN keyword match"
+  },
+  "background_research_decisions": {
+    "postgres_korean_fts": "pg_trgm GIN (no extra dependencies)",
+    "html_samples": "captured during scraper implementation as test fixtures",
+    "airflow_executor": "LocalExecutor",
+    "redis_role": "dedup cache (separate from any Airflow needs)",
+    "nominatim_policy": "1 req/sec, custom User-Agent, results cached in Redis 30d"
+  },
+  "architecture": {
+    "stack": {
+      "scraping": "Scrapling (StealthyFetcher + DynamicFetcher)",
+      "orchestration": "Apache Airflow (LocalExecutor)",
+      "storage": "PostgreSQL (with pg_trgm + postgis)",
+      "cache": "Redis",
+      "deployment": "Docker Compose"
+    },
+    "sources": [
+      {"name": "svkoreans", "url": "svkoreans.com/rent_housing", "fetcher": "StealthyFetcher", "schedule": "0 */6 * * *", "status": "active"},
+      {"name": "gtksa", "url": "gtksa.net/bbs/board.php?bo_table=rent", "fetcher": "StealthyFetcher", "schedule": "0 */6 * * *", "status": "active"},
+      {"name": "missyusa", "url": "missyusa.com", "path": "town9", "fetcher": "StealthyFetcher", "schedule": "0 */6 * * *", "status": "active"},
+      {"name": "ktown_koreadaily", "url": "ktown.koreadaily.com/ad_rent/rentlist", "fetcher": "StealthyFetcher", "schedule": "0 */6 * * *", "status": "active"},
+      {"name": "radiokorea", "url": "m.radiokorea.com", "path": "c_realestate", "fetcher": "DynamicFetcher", "schedule": "0 */6 * * *", "status": "active"},
+      {"name": "hanintown", "url": "hanintown.com", "fetcher": "StealthyFetcher", "schedule": null, "status": "disabled"}
+    ],
+    "database_schema": {
+      "schemas": ["raw", "staging", "public", "audit"],
+      "tables": [
+        {"schema": "raw", "table": "scraped_pages", "purpose": "Raw HTML staging"},
+        {"schema": "staging", "table": "listings_staging", "purpose": "Parsed intermediate data"},
+        {"schema": "public", "table": "listings", "purpose": "Final clean table", "indexes": {"count": 8, "special": ["GiST geo_point", "GIN pg_trgm on (title_ko, body_ko, address_raw)"]}},
+        {"schema": "public", "table": "sources", "purpose": "Source registry"},
+        {"schema": "audit", "table": "etl_runs", "purpose": "Per-run logs with row counts, errors, duration"}
+      ]
+    },
+    "airflow_dags": [
+      {
+        "dag_id": "korean_rental_full_etl",
+        "schedule": "0 */6 * * *",
+        "tasks": ["health_check", "extract", "transform", "load", "validate", "notify"]
+      },
+      {
+        "dag_id": "korean_rental_cleanup",
+        "schedule": "0 3 * * *",
+        "tasks": ["mark_stale_listings_inactive", "purge_old_raw_pages"]
+      }
+    ],
+    "component_layout": {
+      "root_files": ["pyproject.toml", "docker-compose.yml", "docker-compose.test.yml", ".env.example", "README.md", "Makefile"],
+      "config": ["config/sources.yml"],
+      "sql": ["sql/migrations/"],
+      "src": {
+        "extract": ["fetcher_selector.py", "base_scraper.py", "scrapers/{svkoreans,gtksa,missyusa,ktown_koreadaily,radiokorea}.py", "raw_writer.py"],
+        "transform": ["parsers/", "normalizers/{price,date,location,contact}.py", "geocoder.py", "classifier.py", "dedup/{redis_layer,hash_layer,fuzzy_layer}.py"],
+        "load": ["upserter.py", "audit.py"],
+        "validation": ["thresholds.py"],
+        "db": ["connection.py", "models.py"],
+        "cli": ["cli.py"]
+      },
+      "airflow": ["airflow/dags/full_etl.py", "airflow/dags/cleanup.py"],
+      "tests": ["tests/fixtures/html/<source>/", "tests/unit/", "tests/integration/"]
+    }
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Project skeleton, tooling, and CI-equivalent local checks",
+      "objective": "Stand up an empty but fully-tooled Python project so every subsequent task can be developed test-first.",
+      "guidance": [
+        "Initialize uv project (Python 3.11) with placeholder deps for scrapling, psycopg, redis, rapidfuzz, pyyaml, pydantic, click, apache-airflow.",
+        "Configure ruff (lint+format), mypy --strict, pytest with pytest-cov, pre-commit.",
+        "Create directory skeleton with __init__.py and a placeholder cli.py exposing --version.",
+        "Add Makefile with targets: lint, typecheck, test, test-integration, ci, smoke."
+      ],
+      "tests": ["tests/unit/test_smoke.py passes; ruff/mypy clean"],
+      "demo": "`make ci` runs ruff+mypy+pytest green on a fresh clone; `python -m korean_rental_etl.cli --version` prints a version string."
+    },
+    {
+      "id": 2,
+      "title": "Source registry, config loader, and FetcherSelector",
+      "objective": "Encode all 6 sources in YAML and provide a typed loader plus a fetcher factory.",
+      "guidance": [
+        "config/sources.yml lists all sources with name, url, path, fetcher, schedule, download_delay, concurrent_requests, robots_txt_obey, status.",
+        "SourceConfig Pydantic model + load_sources() loader.",
+        "FetcherSelector.for_source(cfg) returns Scrapling fetcher pre-configured with stealth options + delays + retry/backoff."
+      ],
+      "tests": ["YAML round-trip", "validation errors on missing fields", "selector returns correct fetcher class", "active_sources() excludes disabled"],
+      "demo": "`cli sources list` prints active/disabled sources from YAML; `sources show svkoreans` prints resolved config."
+    },
+    {
+      "id": 3,
+      "title": "Postgres schema migrations + Docker Compose dev stack",
+      "objective": "Provide reproducible schemas, indexes, extensions, and a working dev DB.",
+      "guidance": [
+        "SQL migrations creating raw/staging/public/audit schemas and the 5 tables with bilingual columns.",
+        "8 indexes on public.listings including GiST on geo_point and GIN pg_trgm on (title_ko, body_ko, address_raw).",
+        "docker-compose.yml: postgres (init script creates Airflow + app DBs, enables pg_trgm + postgis), redis.",
+        "docker-compose.test.yml on different ports.",
+        "db/connection.py psycopg pool from env vars."
+      ],
+      "tests": ["tests/integration/db/test_schema.py spins up test compose, runs migrations, asserts tables/indexes/extensions exist"],
+      "demo": "`docker compose up -d postgres redis && make test-integration` green; psql shows all tables."
+    },
+    {
+      "id": 4,
+      "title": "Raw-HTML writer + audit-run record + Redis URL cache (dedup layer 1)",
+      "objective": "Persist fetched HTML idempotently, log every run, and short-circuit re-fetches.",
+      "guidance": [
+        "raw_writer.save(...) writes raw.scraped_pages with ON CONFLICT (source_id, url, content_hash) DO NOTHING.",
+        "audit.start_run/finish_run lifecycle helpers.",
+        "redis_layer.seen(url)/mark(url) per-source SET with TTL=14d."
+      ],
+      "tests": ["unit (mocked psycopg/redis)", "integration: writer roundtrip, audit lifecycle, redis seen/mark"],
+      "demo": "`cli demo write-raw --source svkoreans --html-file …` inserts a row; rerun is a no-op."
+    },
+    {
+      "id": 5,
+      "title": "First source extractor — svkoreans (walking-skeleton scraper)",
+      "objective": "Prove the extract path end-to-end with a real Cloudflare-protected source.",
+      "guidance": [
+        "BaseScraper ABC: crawl_list_pages(), fetch_detail(url), shared retry/backoff/ban-detection.",
+        "scrapers/svkoreans.py uses StealthyFetcher with solve_cloudflare=True.",
+        "Capture ≥3 list + ≥5 detail HTML samples into tests/fixtures/html/svkoreans/.",
+        "Detail-page gating: fetch only on Redis-miss OR list-summary content-hash change.",
+        "Wire to raw_writer + audit + redis layer."
+      ],
+      "tests": ["unit on link extraction with fixtures", "integration runs extractor against fixtures (no network) and asserts raw rows"],
+      "demo": "`cli extract --source svkoreans` populates raw.scraped_pages; second run only inserts new pages."
+    },
+    {
+      "id": 6,
+      "title": "Remaining four extractors — gtksa, missyusa, ktown_koreadaily, radiokorea",
+      "objective": "Complete the Extract phase across all 5 active sources.",
+      "guidance": [
+        "Repeat Task 5 pattern for each source; radiokorea uses DynamicFetcher per its config.",
+        "Capture HTML fixtures (≥3 list, ≥5 detail) per source.",
+        "Add `extract --all` CLI iterating active sources sequentially with per-source delays."
+      ],
+      "tests": ["one integration test per source", "test_extract_all runs all four against fixtures"],
+      "demo": "`cli extract --all` populates raw.scraped_pages for all 5 sources; reruns idempotent. Extract phase complete."
+    },
+    {
+      "id": 7,
+      "title": "Per-source HTML parsers → staging.listings_staging + content-hash dedup (layer 2)",
+      "objective": "Turn raw HTML into structured bilingual rows and skip unchanged content.",
+      "guidance": [
+        "transform/parsers/<source>.py with Scrapling adaptive selectors (auto_save=True).",
+        "Parsers emit {title_ko, body_ko, raw_price, raw_location, raw_posted_at, contact_block, source_listing_id, url, content_hash}.",
+        "hash_layer skips rows whose content_hash already exists in staging for the same source.",
+        "CLI: `transform parse` reads unparsed raw rows → staging rows."
+      ],
+      "tests": ["golden-file tests per source (HTML in, dict out)", "hash-layer dedup unit test"],
+      "demo": "`cli transform parse` produces staging rows for all 5 sources; rerun produces zero new rows."
+    },
+    {
+      "id": 8,
+      "title": "Normalizers — price, date, location, contact",
+      "objective": "Convert Korean raw fields into bilingual normalized columns.",
+      "guidance": [
+        "price.py: 월세/보증금/전세/단기/리스 + USD/KRW → {rent_monthly_usd, deposit_usd, lease_type, currency_raw, price_raw_ko}.",
+        "date.py: 2024년 5월 1일 / 오늘 / 어제 / 방금 전 / ~까지 → ISO-8601 posted_at_utc.",
+        "location.py: address_raw → {city, state_or_province, country} with US/Canada/KR detection.",
+        "contact.py: regex-extract phone, kakao_id, email; plaintext.",
+        "Failures land in errors JSONB without crashing the run."
+      ],
+      "tests": ["table-driven unit tests per normalizer with KO/EN/edge cases (≥80% coverage)"],
+      "demo": "`transform parse` outputs staging rows with bilingual + normalized fields populated."
+    },
+    {
+      "id": 9,
+      "title": "Nominatim geocoder with Redis caching + rate limit",
+      "objective": "Geocode addresses politely and cheaply; tolerate failures.",
+      "guidance": [
+        "geocoder.py: input (address_raw, city, country); SHA1-keyed Redis cache TTL 30d.",
+        "1 req/sec global token bucket; custom User-Agent from env.",
+        "Failures leave lat/lon NULL and log to audit errors.",
+        "Writes geo_point (PostGIS) on staging rows."
+      ],
+      "tests": ["unit (httpx + cache hit/miss mocks)", "integration against test redis with stubbed responses"],
+      "demo": "`transform geocode` enriches resolvable addresses with lat/lon; second run hits cache only."
+    },
+    {
+      "id": 10,
+      "title": "Category classifier (rule-based KO+EN keywords)",
+      "objective": "Tag every listing with one of the 9 English category labels.",
+      "guidance": [
+        "classifier.py: bilingual keyword dict → {apartment, house, condo, room_share, sublet, roommate_wanted, commercial_space, parking, other}.",
+        "Multi-match → priority order; unmatched → 'other'."
+      ],
+      "tests": ["parameterized unit tests covering every category from KO and EN inputs and ambiguous cases"],
+      "demo": "`transform classify` populates category on every staging row; CLI prints distribution."
+    },
+    {
+      "id": 11,
+      "title": "Cross-source fuzzy dedup (layer 3) + canonicalization",
+      "objective": "Collapse the same listing posted on multiple boards into one canonical record.",
+      "guidance": [
+        "fuzzy_layer.py with RapidFuzz: blocking by (±7d posted_at, normalized_city); token-set similarity on f'{title} {price}' ≥ 0.90.",
+        "Group matches; canonical = source-priority + earliest posted_at; mark others duplicate_of."
+      ],
+      "tests": ["unit tests with synthetic listings posted on 2-3 boards: clear positives, near-misses, time-window edges"],
+      "demo": "`transform dedup` collapses cross-source duplicates; CLI prints duplicates/canonicals counts. Transform phase complete."
+    },
+    {
+      "id": 12,
+      "title": "Loader — batch upsert into public.listings with audit",
+      "objective": "Move clean staging rows into the final table idempotently.",
+      "guidance": [
+        "upserter.py: per-batch INSERT … ON CONFLICT (source_id, source_listing_id) DO UPDATE in a single transaction; batch size 500.",
+        "Updates last_seen_at, is_active=true; records counts in audit.etl_runs.",
+        "CLI: `load run` consumes staging rows where loaded_at IS NULL."
+      ],
+      "tests": ["integration: staging→public roundtrip", "conflict path", "partial-batch failure rolls back batch and continues", "audit row written"],
+      "demo": "`cli run-all` performs full extract→transform→load against fixtures; pg_trgm FTS query returns expected hits. Load phase complete."
+    },
+    {
+      "id": 13,
+      "title": "Validation task with threshold rules",
+      "objective": "Fail fast when a run looks abnormal so we don't poison the table.",
+      "guidance": [
+        "thresholds.py: parsed_rows ≥ 0.5 × avg(last_5_runs); null_rate(price|location|title) ≤ 0.20; FK integrity listings.source_id → sources.id.",
+        "Returns structured result; failure raises ValidationError.",
+        "CLI: `validate run --run-id …`."
+      ],
+      "tests": ["unit tests for each threshold (pass/fail edges) using synthetic audit history"],
+      "demo": "Synthetic collapsed-row run → validate fails with explicit reason; healthy run passes."
+    },
+    {
+      "id": 14,
+      "title": "Airflow setup + korean_rental_full_etl DAG",
+      "objective": "Orchestrate the full pipeline on a 6-hour cadence with email notifications.",
+      "guidance": [
+        "Add Airflow webserver + scheduler services to docker-compose.yml using LocalExecutor.",
+        "Airflow metadata DB separate from app DB.",
+        "dags/full_etl.py schedule '0 */6 * * *', tasks health_check → extract → transform → load → validate → notify via BashOperator/PythonOperator wrapping CLI.",
+        "Each task wraps audit.start_run/finish_run.",
+        "EmailOperator for success/failure notifications via SMTP from .env.",
+        "Conservative retry/backoff per task."
+      ],
+      "tests": ["tests/integration/full_etl_dag/test_dag_import.py runs `airflow dags test korean_rental_full_etl <date>` against test compose with fixtures"],
+      "demo": "`docker compose up`, trigger DAG in Airflow UI → all six tasks green; failure email lands in MailHog (dev SMTP sink)."
+    },
+    {
+      "id": 15,
+      "title": "Cleanup DAG + final docs/runbook",
+      "objective": "Maintain the table over time and ship onboarding documentation.",
+      "guidance": [
+        "dags/cleanup.py schedule '0 3 * * *', tasks mark_stale_listings_inactive (UPDATE is_active=false WHERE last_seen_at < NOW() - INTERVAL '14 days') and purge_old_raw_pages (DELETE WHERE fetched_at < NOW() - INTERVAL '90 days').",
+        ".env.example, README.md (quickstart, architecture, troubleshooting), source-onboarding runbook.",
+        "`make smoke` runs `airflow dags test` for both DAGs.",
+        "Final coverage check ≥80% on transform/."
+      ],
+      "tests": ["integration test time-travels last_seen_at and fetched_at, runs cleanup, asserts correct rows flipped/purged"],
+      "demo": "Fresh-clone walkthrough — `cp .env.example .env && docker compose up -d && make smoke` green; cleanup DAG triggered manually shows correct stale/purge counts. Project complete."
+    }
+  ]
+}
