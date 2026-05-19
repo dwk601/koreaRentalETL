@@ -21,7 +21,7 @@ typecheck: ## Run mypy type checker
 	uv run mypy src/
 
 test: ## Run unit tests with coverage
-	uv run pytest tests/unit/ -v --cov=korean_rental_etl --cov-report=term-missing
+	uv run pytest tests/unit/ -v --cov=korean_rental_etl --cov=korean_rental_etl.transform --cov-report=term-missing --cov-fail-under=80
 
 test-integration: ## Run integration tests (requires Docker Compose)
 	uv run pytest tests/integration/ -v -m integration
