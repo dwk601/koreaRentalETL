@@ -19,6 +19,7 @@ dependencies = [
     "click>=8.1.0",
     "httpx>=0.25.0",
     "psycopg-pool>=3.3.1",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [project.optional-dependencies]
