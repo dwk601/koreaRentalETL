@@ -12,10 +12,43 @@ def main() -> None:
     pass
 
 
-@main.command()
+@main.group()
 def sources() -> None:
-    """List configured sources."""
-    click.echo("Sources command placeholder")
+    """Manage source configurations."""
+    pass
+
+
+@sources.command("list")
+def sources_list() -> None:
+    """List all configured sources."""
+    from korean_rental_etl.extract.source_config import load_sources
+
+    config = load_sources()
+    for s in config.sources:
+        status = "✓" if s.is_active else "✗"
+        click.echo(f"  {status} {s.name:20s} {s.fetcher:20s} {s.full_url}")
+
+
+@sources.command("show")
+@click.argument("name")
+def sources_show(name: str) -> None:
+    """Show details for a specific source."""
+    from korean_rental_etl.extract.source_config import get_source, load_sources
+
+    config = load_sources()
+    try:
+        s = get_source(config, name)
+    except KeyError as e:
+        click.echo(f"Source not found: {name}", err=True)
+        raise SystemExit(1) from e
+
+    click.echo(f"Name:        {s.name}")
+    click.echo(f"URL:         {s.full_url}")
+    click.echo(f"Fetcher:     {s.fetcher}")
+    click.echo(f"Schedule:    {s.schedule or 'disabled'}")
+    click.echo(f"Delay:       {s.download_delay_sec}s")
+    click.echo(f"Status:      {s.status}")
+    click.echo(f"Description: {s.description}")
 
 
 @main.command()

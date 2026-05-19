@@ -116,3 +116,8 @@ exclude_lines = [
     "except ImportError",
 ]
 fail_under = 80
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20260518",
+]
