@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import date, timedelta
 
 
-def parse_korean_date(s: str, today: Optional[date] = None) -> Optional[date]:
+def parse_korean_date(s: str, today: date | None = None) -> date | None:
     """Parse Korean date strings in various formats.
 
     Handles:
@@ -32,7 +31,9 @@ def parse_korean_date(s: str, today: Optional[date] = None) -> Optional[date]:
 
     # Try YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD
     for sep in ["-", ".", "/"]:
-        match = re.match(r"(\d{4})" + re.escape(sep) + r"(\d{1,2})" + re.escape(sep) + r"(\d{1,2})", s)
+        match = re.match(
+            r"(\d{4})" + re.escape(sep) + r"(\d{1,2})" + re.escape(sep) + r"(\d{1,2})", s
+        )
         if match:
             try:
                 return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))

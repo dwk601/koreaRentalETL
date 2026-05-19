@@ -2,8 +2,6 @@
 
 from datetime import date, timedelta
 
-import pytest
-
 from korean_rental_etl.extract.base_scraper import BaseScraper
 
 

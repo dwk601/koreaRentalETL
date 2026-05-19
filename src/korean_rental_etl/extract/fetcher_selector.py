@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from scrapling import DynamicFetcher, Fetcher, StealthyFetcher
+from typing import Any
 
 
 class FetcherSelector:
@@ -32,9 +29,7 @@ class FetcherSelector:
         try:
             from scrapling import DynamicFetcher, Fetcher, StealthyFetcher
         except (ImportError, ModuleNotFoundError) as e:
-            raise ImportError(
-                f"scrapling not available: {e}. Install with: uv sync"
-            ) from e
+            raise ImportError(f"scrapling not available: {e}. Install with: uv sync") from e
 
         if fetcher_type == "Fetcher":
             return Fetcher  # type: ignore[return-value]

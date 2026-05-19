@@ -50,9 +50,7 @@ class TestScraperFactory:
             ScraperFactory.create(config, source_id=99)
 
     def test_create_with_custom_delay(self) -> None:
-        config = SourceConfig(
-            name="svkoreans", url="https://svkoreans.com", download_delay_sec=5.0
-        )
+        config = SourceConfig(name="svkoreans", url="https://svkoreans.com", download_delay_sec=5.0)
         scraper = ScraperFactory.create(config, source_id=1)
         assert scraper._download_delay_sec == 5.0
 

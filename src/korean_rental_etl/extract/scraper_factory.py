@@ -50,7 +50,7 @@ class ScraperFactory:
         return scraper_class(
             source_id=source_id,
             download_delay_sec=source_config.download_delay_sec,
-        )
+        )  # type: ignore[return-value]
 
     @classmethod
     def available_sources(cls) -> list[str]:

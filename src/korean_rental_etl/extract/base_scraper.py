@@ -68,9 +68,7 @@ class BaseScraper(ABC):
             BanDetectedError: If a ban/challenge is detected.
             Exception: If fetch fails after retries.
         """
-        return self._with_retry(
-            lambda: self._fetch_with_ban_check(url, **kwargs)
-        )
+        return self._with_retry(lambda: self._fetch_with_ban_check(url, **kwargs))
 
     def _fetch_with_ban_check(self, url: str, **kwargs: Any) -> Any:
         """Fetch URL and check for ban/challenge."""
@@ -145,7 +143,8 @@ class BaseScraper(ABC):
         Returns:
             True if post_date is within cutoff_days, False otherwise.
         """
-        from datetime import date as date_type, timedelta
+        from datetime import date as date_type
+        from datetime import timedelta
 
         if post_date is None:
             return True

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from korean_rental_etl.cli.cli import main, sources_list, sources_show
+from korean_rental_etl.cli.cli import main
 
 
 class TestSourcesCommands:

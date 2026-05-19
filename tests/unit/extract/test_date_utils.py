@@ -2,8 +2,6 @@
 
 from datetime import date
 
-import pytest
-
 from korean_rental_etl.extract.date_utils import parse_korean_date
 
 

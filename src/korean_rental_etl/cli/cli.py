@@ -70,6 +70,7 @@ def extract(source: str | None, extract_all: bool) -> None:
         sources_to_extract = active_sources(config)
     else:
         try:
+            assert source is not None
             sources_to_extract = [get_source(config, source)]
         except KeyError as e:
             click.echo(f"Error: {e}", err=True)
