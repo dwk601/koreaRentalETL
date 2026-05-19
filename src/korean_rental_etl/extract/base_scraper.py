@@ -83,7 +83,7 @@ class BaseScraper(ABC):
         """Yield listing summary dicts from all list pages.
 
         Each dict should contain at minimum:
-            {'url': str, 'source_listing_id': str, 'title': str, ...}
+            {'url': str, 'source_listing_id': str, 'title': str, 'post_date': date or None, ...}
         """
         raise NotImplementedError
 
@@ -155,6 +155,46 @@ class BaseScraper(ABC):
 
         cutoff_date = date_type.today() - timedelta(days=self.cutoff_days)
         return post_date >= cutoff_date
+
+    def _resolve_post_date(self, listing: dict[str, Any]) -> Any:
+        """Resolve post_date, fetching detail if ambiguous.
+
+        Args:
+            listing: Listing dict with optional 'post_date' and 'post_date_ambiguous' keys.
+
+        Returns:
+            Resolved date or None.
+        """
+        post_date = listing.get("post_date")
+        if not listing.get("post_date_ambiguous"):
+            return post_date
+
+        # Ambiguous date: try to fetch detail for clarification
+        url = listing.get("url")
+        if not url:
+            return post_date
+
+        try:
+            detail = self.fetch_detail(url)
+            detail_date = self.parse_detail_date(detail)
+            if detail_date:
+                listing["detail_html"] = detail.get("html")
+                return detail_date
+        except Exception as e:
+            logger.debug("Could not fetch detail for date resolution: %s", e)
+
+        return post_date
+
+    def parse_detail_date(self, detail: dict[str, Any]) -> Any:
+        """Parse date from detail page HTML. Override in subclass if needed.
+
+        Args:
+            detail: Dict with 'html' key containing detail page HTML.
+
+        Returns:
+            Parsed date or None.
+        """
+        return None
 
     def extract(self) -> tuple[int, int]:
         """Run full extraction for this source.
