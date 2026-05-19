@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: korean_rental_postgres_test
+    environment:
+      POSTGRES_DB: korean_rental_test
+      POSTGRES_USER: etl_test
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "15432:5432"
+    volumes:
+      - ./sql/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etl_test -d korean_rental_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: korean_rental_redis_test
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
