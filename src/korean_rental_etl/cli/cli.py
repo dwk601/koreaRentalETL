@@ -56,12 +56,33 @@ def sources_show(name: str) -> None:
 @click.option("--all", "extract_all", is_flag=True, help="Extract from all active sources")
 def extract(source: str | None, extract_all: bool) -> None:
     """Extract listings from sources."""
+    from korean_rental_etl.extract.scraper_factory import ScraperFactory
+    from korean_rental_etl.extract.source_config import active_sources, get_source, load_sources
+
+    config = load_sources()
+
+    if not extract_all and not source:
+        click.echo("Error: Please specify --source or --all", err=True)
+        raise SystemExit(1)
+
+    sources_to_extract = []
     if extract_all:
-        click.echo("Extracting from all active sources...")
-    elif source:
-        click.echo(f"Extracting from {source}...")
+        sources_to_extract = active_sources(config)
     else:
-        click.echo("Please specify --source or --all")
+        try:
+            sources_to_extract = [get_source(config, source)]
+        except KeyError as e:
+            click.echo(f"Error: {e}", err=True)
+            raise SystemExit(1) from e
+
+    for src_config in sources_to_extract:
+        try:
+            click.echo(f"Extracting from {src_config.name}...")
+            scraper = ScraperFactory.create(src_config, source_id=1)
+            extracted, skipped = scraper.extract()
+            click.echo(f"  ✓ Extracted {extracted} listings, skipped {skipped}")
+        except Exception as e:
+            click.echo(f"  ✗ Error: {e}", err=True)
 
 
 @main.command()
