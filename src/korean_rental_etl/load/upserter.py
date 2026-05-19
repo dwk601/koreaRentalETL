@@ -111,7 +111,9 @@ def load_from_staging(source_id: int | None = None) -> tuple[int, int]:
     Returns:
         Tuple of (rows_loaded, rows_failed).
     """
-    run_db_id = start_run(task_id="load", source_name="all" if source_id is None else str(source_id))
+    run_db_id = start_run(
+        task_id="load", source_name="all" if source_id is None else str(source_id)
+    )
 
     with get_cursor() as cur:
         if source_id:
@@ -143,7 +145,9 @@ def load_from_staging(source_id: int | None = None) -> tuple[int, int]:
 
         finish_run(run_db_id, status="success", rows_loaded=loaded, rows_failed=failed)
     except Exception as e:
-        finish_run(run_db_id, status="failed", rows_loaded=loaded, rows_failed=failed, error_message=str(e))
+        finish_run(
+            run_db_id, status="failed", rows_loaded=loaded, rows_failed=failed, error_message=str(e)
+        )
         raise
 
     return loaded, failed

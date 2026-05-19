@@ -1,8 +1,6 @@
 """Unit tests for fuzzy dedup layer."""
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from korean_rental_etl.transform.dedup.fuzzy_layer import find_duplicates
 
@@ -12,7 +10,7 @@ class TestFuzzyLayer:
 
     def test_clear_duplicates_same_city_same_day(self):
         """Should mark identical listings in same city/day as duplicates."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         listings = [
             {
                 "id": 1,
@@ -38,7 +36,7 @@ class TestFuzzyLayer:
 
     def test_time_window_edge_6_days(self):
         """Should match listings 6 days apart (within window)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         date_a = now.isoformat()
         date_b = (now - timedelta(days=6)).isoformat()
 
@@ -65,7 +63,7 @@ class TestFuzzyLayer:
 
     def test_time_window_edge_8_days(self):
         """Should NOT match listings 8 days apart (outside window)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         date_a = now.isoformat()
         date_b = (now - timedelta(days=8)).isoformat()
 
@@ -92,7 +90,7 @@ class TestFuzzyLayer:
 
     def test_near_miss_below_threshold(self):
         """Should NOT match listings below similarity threshold."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         listings = [
             {
                 "id": 1,
@@ -116,7 +114,7 @@ class TestFuzzyLayer:
 
     def test_different_cities_no_match(self):
         """Should NOT match listings in different cities."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         listings = [
             {
                 "id": 1,
@@ -140,7 +138,7 @@ class TestFuzzyLayer:
 
     def test_canonical_earliest_posted_at(self):
         """Should pick canonical as earliest posted_at."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         date_a = (now - timedelta(days=2)).isoformat()
         date_b = now.isoformat()
 

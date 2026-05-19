@@ -1,7 +1,5 @@
 """Unit tests for geocoder."""
 
-import pytest
-
 from korean_rental_etl.transform.geocoder import geocode
 
 
@@ -17,7 +15,9 @@ class TestGeocoder:
         """Should return cached result on cache hit."""
         mock_redis = mocker.MagicMock()
         mock_redis.get.return_value = "40.7128,-74.0060"
-        mocker.patch("korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis)
+        mocker.patch(
+            "korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis
+        )
 
         result = geocode("New York", "NY", "US")
         assert result["lat"] == 40.7128
@@ -27,7 +27,9 @@ class TestGeocoder:
         """Should call Nominatim on cache miss and cache result."""
         mock_redis = mocker.MagicMock()
         mock_redis.get.return_value = None
-        mocker.patch("korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis)
+        mocker.patch(
+            "korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis
+        )
 
         mock_response = mocker.MagicMock()
         mock_response.json.return_value = [{"lat": "40.7128", "lon": "-74.0060"}]
@@ -42,9 +44,13 @@ class TestGeocoder:
         """Should return None on Nominatim failure."""
         mock_redis = mocker.MagicMock()
         mock_redis.get.return_value = None
-        mocker.patch("korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis)
+        mocker.patch(
+            "korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis
+        )
 
-        mocker.patch("korean_rental_etl.transform.geocoder.httpx.get", side_effect=Exception("Network error"))
+        mocker.patch(
+            "korean_rental_etl.transform.geocoder.httpx.get", side_effect=Exception("Network error")
+        )
 
         result = geocode("Invalid Address XYZ", "XX", "ZZ")
         assert result == {"lat": None, "lon": None}
@@ -53,7 +59,9 @@ class TestGeocoder:
         """Should return None when Nominatim returns no results."""
         mock_redis = mocker.MagicMock()
         mock_redis.get.return_value = None
-        mocker.patch("korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis)
+        mocker.patch(
+            "korean_rental_etl.transform.geocoder.get_redis_client", return_value=mock_redis
+        )
 
         mock_response = mocker.MagicMock()
         mock_response.json.return_value = []

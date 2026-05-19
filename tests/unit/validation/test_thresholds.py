@@ -1,10 +1,6 @@
 """Unit tests for validation thresholds."""
 
-import pytest
-
 from korean_rental_etl.validation.thresholds import (
-    ThresholdResult,
-    ValidationError,
     check_fk_integrity,
     check_null_rate_threshold,
     check_parsed_rows_threshold,
