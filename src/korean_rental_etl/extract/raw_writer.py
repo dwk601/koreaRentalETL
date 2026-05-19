@@ -57,9 +57,13 @@ def save(
         inserted = result is not None
 
     if inserted:
-        logger.debug("Saved new page: source_id=%d url=%s hash=%s", source_id, url, content_hash[:12])
+        logger.debug(
+            "Saved new page: source_id=%d url=%s hash=%s", source_id, url, content_hash[:12]
+        )
     else:
-        logger.debug("Page already exists: source_id=%d url=%s hash=%s", source_id, url, content_hash[:12])
+        logger.debug(
+            "Page already exists: source_id=%d url=%s hash=%s", source_id, url, content_hash[:12]
+        )
 
     return inserted
 

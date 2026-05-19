@@ -44,7 +44,9 @@ class BaseScraper(ABC):
     _backoff_base_sec: float = 5.0
     _fetcher: Any | None = None
 
-    def __init__(self, source_id: int, download_delay_sec: float = 2.0, max_retries: int = 3) -> None:
+    def __init__(
+        self, source_id: int, download_delay_sec: float = 2.0, max_retries: int = 3
+    ) -> None:
         self.source_id = source_id
         self._download_delay_sec = download_delay_sec
         self._max_retries = max_retries
@@ -96,10 +98,19 @@ class BaseScraper(ABC):
                 raise
             except Exception as e:
                 if attempt == self._max_retries:
-                    logger.error("%s scrape failed after %d attempts: %s", self.source_name, attempt, e)
+                    logger.error(
+                        "%s scrape failed after %d attempts: %s", self.source_name, attempt, e
+                    )
                     raise
                 sleep = self._backoff_base_sec * (2 ** (attempt - 1))
-                logger.warning("%s attempt %d/%d failed, retrying in %.1fs: %s", self.source_name, attempt, self._max_retries, sleep, e)
+                logger.warning(
+                    "%s attempt %d/%d failed, retrying in %.1fs: %s",
+                    self.source_name,
+                    attempt,
+                    self._max_retries,
+                    sleep,
+                    e,
+                )
                 time.sleep(sleep)
         return None  # unreachable
 

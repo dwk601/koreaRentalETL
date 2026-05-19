@@ -27,7 +27,9 @@ class TestSeen:
         mock_get_redis.return_value = mock_client
 
         assert seen("svkoreans", "https://example.com/1") is True
-        mock_client.sismember.assert_called_once_with("seen_urls:svkoreans", "https://example.com/1")
+        mock_client.sismember.assert_called_once_with(
+            "seen_urls:svkoreans", "https://example.com/1"
+        )
 
     @patch("korean_rental_etl.transform.dedup.redis_layer.get_redis_client")
     def test_returns_false_when_not_member(self, mock_get_redis: MagicMock) -> None:

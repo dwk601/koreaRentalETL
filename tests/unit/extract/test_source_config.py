@@ -102,9 +102,7 @@ class TestGetSource:
         assert result.name == "beta"
 
     def test_get_missing_source_raises(self) -> None:
-        config = SourcesConfig(
-            sources=[SourceConfig(name="alpha", url="https://a.com")]
-        )
+        config = SourcesConfig(sources=[SourceConfig(name="alpha", url="https://a.com")])
         with pytest.raises(KeyError, match="Source not found: missing"):
             get_source(config, "missing")
 

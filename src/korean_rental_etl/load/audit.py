@@ -40,7 +40,9 @@ def start_run(
         result: dict[str, Any] | None = cur.fetchone()  # type: ignore[assignment]
         run_db_id = int(result["id"])  # type: ignore[index]
 
-    logger.info("Started ETL run %d (dag=%s, task=%s, source=%s)", run_db_id, dag_id, task_id, source_name)
+    logger.info(
+        "Started ETL run %d (dag=%s, task=%s, source=%s)", run_db_id, dag_id, task_id, source_name
+    )
     return run_db_id
 
 
@@ -101,7 +103,13 @@ def finish_run(
 
     logger.info(
         "Finished ETL run %d: status=%s extracted=%d transformed=%d loaded=%d failed=%d duration=%.1fs",
-        run_db_id, status, rows_extracted, rows_transformed, rows_loaded, rows_failed, duration,
+        run_db_id,
+        status,
+        rows_extracted,
+        rows_transformed,
+        rows_loaded,
+        rows_failed,
+        duration,
     )
 
 

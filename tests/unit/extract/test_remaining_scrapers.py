@@ -40,7 +40,9 @@ class TestKtownKoreadailyScraper:
     def test_crawl_list_pages(self, scraper: KtownKoreadailyScraper) -> None:
         listings = list(scraper.crawl_list_pages())
         assert len(listings) == 3
-        assert all(listing["url"].startswith("https://ktown.koreadaily.com/") for listing in listings)
+        assert all(
+            listing["url"].startswith("https://ktown.koreadaily.com/") for listing in listings
+        )
 
 
 class TestRadiokoreaScraper:

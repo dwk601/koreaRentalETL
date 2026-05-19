@@ -31,9 +31,7 @@ class TestSchema:
     def test_extensions_installed(self, test_conn: psycopg.Connection) -> None:
         """PostGIS and pg_trgm extensions are installed."""
         with test_conn.cursor() as cur:
-            cur.execute(
-                "SELECT extname FROM pg_extension WHERE extname IN ('postgis', 'pg_trgm')"
-            )
+            cur.execute("SELECT extname FROM pg_extension WHERE extname IN ('postgis', 'pg_trgm')")
             extensions = {row[0] for row in cur.fetchall()}
             assert "postgis" in extensions
             assert "pg_trgm" in extensions

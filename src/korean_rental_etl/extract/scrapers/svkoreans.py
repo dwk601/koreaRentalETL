@@ -67,13 +67,21 @@ class SvkoreansScraper(BaseScraper):
         """Parse listing links from a fixture HTML file (for testing)."""
         from pathlib import Path
 
-        fixture = Path(__file__).parent.parent.parent.parent.parent / "tests" / "fixtures" / "html" / "svkoreans" / "list_page_1.html"
+        fixture = (
+            Path(__file__).parent.parent.parent.parent.parent
+            / "tests"
+            / "fixtures"
+            / "html"
+            / "svkoreans"
+            / "list_page_1.html"
+        )
         if not fixture.exists():
             logger.warning("No fixture found at %s", fixture)
             return
 
         html = fixture.read_text()
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html, "html.parser")
         rows = soup.select("table.board_list tr")
         for row in rows:

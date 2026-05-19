@@ -55,7 +55,15 @@ class KtownKoreadailyScraper(BaseScraper):
         from pathlib import Path
 
         from bs4 import BeautifulSoup
-        fixture = Path(__file__).parent.parent.parent.parent.parent / "tests" / "fixtures" / "html" / "ktown_koreadaily" / "list_page_1.html"
+
+        fixture = (
+            Path(__file__).parent.parent.parent.parent.parent
+            / "tests"
+            / "fixtures"
+            / "html"
+            / "ktown_koreadaily"
+            / "list_page_1.html"
+        )
         if not fixture.exists():
             return []
         html = fixture.read_text()

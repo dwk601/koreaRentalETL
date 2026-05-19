@@ -2,7 +2,7 @@
 
 import hashlib
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 def compute_content_hash(html: str) -> str:
@@ -27,7 +27,7 @@ def parse_korean_date(date_str: str) -> str | None:
         return None
 
     date_str = date_str.strip()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     # Handle relative dates
     if "오늘" in date_str or "today" in date_str.lower():
@@ -42,7 +42,7 @@ def parse_korean_date(date_str: str) -> str | None:
     if match:
         year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
         try:
-            return datetime(year, month, day, tzinfo=timezone.utc).isoformat()
+            return datetime(year, month, day, tzinfo=UTC).isoformat()
         except ValueError:
             return None
 

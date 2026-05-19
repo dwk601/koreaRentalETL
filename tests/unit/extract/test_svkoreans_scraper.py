@@ -8,7 +8,9 @@ import pytest
 
 from korean_rental_etl.extract.scrapers.svkoreans import SvkoreansScraper
 
-FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "tests" / "fixtures" / "html" / "svkoreans"
+FIXTURES_DIR = (
+    Path(__file__).parent.parent.parent.parent / "tests" / "fixtures" / "html" / "svkoreans"
+)
 
 
 class TestSvkoreansScraper:

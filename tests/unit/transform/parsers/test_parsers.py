@@ -47,7 +47,9 @@ class TestGTKSAParser:
 
         html = html_file.read_text()
         parser = GTKSAParser()
-        result = parser.parse_detail(html, "https://gtksa.net/bbs/board.php?bo_table=rent&wr_id=1001")
+        result = parser.parse_detail(
+            html, "https://gtksa.net/bbs/board.php?bo_table=rent&wr_id=1001"
+        )
 
         assert result["source_listing_id"] == "1001"
         assert "content_hash" in result
