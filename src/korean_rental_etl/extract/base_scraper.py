@@ -35,12 +35,14 @@ class BaseScraper(ABC):
       - Shared retry/backoff
       - Ban detection (403, 429, Cloudflare)
       - Detail-page gating via Redis URL cache
+      - 30-day cutoff filtering
       - Integration with raw_writer + audit
     """
 
     source_name: str
     fetcher_type: str = "Fetcher"
     source_id: int
+    cutoff_days: int = 30
     _download_delay_sec: float = 2.0
     _max_retries: int = 3
     _backoff_base_sec: float = 5.0
@@ -133,6 +135,26 @@ class BaseScraper(ABC):
     def _delay(self) -> None:
         """Sleep for the configured download delay."""
         time.sleep(self._download_delay_sec)
+
+    def _within_cutoff(self, post_date: Any) -> bool:
+        """Check if a post date is within the cutoff window.
+
+        Args:
+            post_date: Date object or None. None is treated as "include".
+
+        Returns:
+            True if post_date is within cutoff_days, False otherwise.
+        """
+        from datetime import date as date_type, timedelta
+
+        if post_date is None:
+            return True
+
+        if not isinstance(post_date, date_type):
+            return True
+
+        cutoff_date = date_type.today() - timedelta(days=self.cutoff_days)
+        return post_date >= cutoff_date
 
     def extract(self) -> tuple[int, int]:
         """Run full extraction for this source.
