@@ -1,0 +1,57 @@
+"""SVKoreans parser."""
+
+from bs4 import BeautifulSoup
+
+from korean_rental_etl.transform.parsers._common import (
+    compute_content_hash,
+    extract_contact_block,
+    extract_text,
+)
+from korean_rental_etl.transform.parsers.base_parser import BaseParser
+
+
+class SVKoreansParser(BaseParser):
+    """Parser for svkoreans.com/rent_housing."""
+
+    def __init__(self):
+        super().__init__("svkoreans")
+
+    def parse_detail(self, html: str, url: str) -> dict:
+        """Parse svkoreans detail page."""
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Extract listing ID from URL
+        source_listing_id = url.split("/")[-1] if "/" in url else "unknown"
+
+        # Title and body (adapt selectors as needed)
+        title_elem = soup.select_one("h1.title, .post-title, h2")
+        title_ko = extract_text(title_elem) if title_elem else ""
+
+        body_elem = soup.select_one(".post-content, .content, .body")
+        body_ko = extract_text(body_elem) if body_elem else ""
+
+        # Price, location, date (generic selectors)
+        price_elem = soup.select_one(".price, .rent-price, [class*='price']")
+        raw_price = extract_text(price_elem) if price_elem else ""
+
+        location_elem = soup.select_one(".location, .address, [class*='location']")
+        raw_location = extract_text(location_elem) if location_elem else ""
+
+        date_elem = soup.select_one(".date, .posted-date, [class*='date']")
+        raw_posted_at = extract_text(date_elem) if date_elem else ""
+
+        # Contact
+        contact_elem = soup.select_one(".contact, .phone, [class*='contact']")
+        contact_block = extract_contact_block(contact_elem)
+
+        return {
+            "title_ko": title_ko,
+            "body_ko": body_ko,
+            "raw_price": raw_price,
+            "raw_location": raw_location,
+            "raw_posted_at": raw_posted_at,
+            "contact_block": contact_block,
+            "source_listing_id": source_listing_id,
+            "url": url,
+            "content_hash": compute_content_hash(html),
+        }
