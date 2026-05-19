@@ -17,14 +17,14 @@ class SvkoreansScraper(BaseScraper):
     """Scraper for svkoreans.com/rent_housing."""
 
     source_name = "svkoreans"
-    fetcher_type = "StealthyFetcher"
+    fetcher_type = "Fetcher"
 
     _list_url = "https://svkoreans.com/rent_housing"
 
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         """Yield listing summaries from the list page."""
         try:
-            response = self.fetcher.fetch(self._list_url, solve_cloudflare=True)
+            response = self.fetch_page(self._list_url)
         except Exception:
             logger.warning("Could not fetch list page, using fixture fallback")
             # Fallback for testing: use fixtures
@@ -56,7 +56,7 @@ class SvkoreansScraper(BaseScraper):
 
     def fetch_detail(self, url: str) -> dict[str, Any]:
         """Fetch detail page HTML."""
-        response = self.fetcher.fetch(url, solve_cloudflare=True)
+        response = self.fetch_page(url)
         return {
             "html": response.text,
             "status": getattr(response, "status_code", 200),

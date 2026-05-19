@@ -17,12 +17,12 @@ class GtksaScraper(BaseScraper):
     """Scraper for gtksa.net/bbs/board.php?bo_table=rent."""
 
     source_name = "gtksa"
-    fetcher_type = "StealthyFetcher"
+    fetcher_type = "Fetcher"
     _list_url = "https://gtksa.net/bbs/board.php?bo_table=rent"
 
     def crawl_list_pages(self) -> Iterator[dict[str, str]]:
         try:
-            response = self.fetcher.fetch(self._list_url)
+            response = self.fetch_page(self._list_url)
             soup = response.bs4
             rows = soup.select("table tr")
         except Exception:
@@ -47,7 +47,7 @@ class GtksaScraper(BaseScraper):
             }
 
     def fetch_detail(self, url: str) -> dict[str, object]:
-        response = self.fetcher.fetch(url)
+        response = self.fetch_page(url)
         return {
             "html": response.text,
             "status": getattr(response, "status_code", 200),

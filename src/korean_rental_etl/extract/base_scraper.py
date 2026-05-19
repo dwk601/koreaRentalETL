@@ -27,6 +27,7 @@ class BaseScraper(ABC):
 
     Subclasses must implement:
       - source_name: str
+      - fetcher_type: str (one of 'Fetcher', 'StealthyFetcher', 'DynamicFetcher')
       - crawl_list_pages() -> Iterator[dict[str, Any]]
       - fetch_detail(url: str) -> dict[str, Any]
 
@@ -38,11 +39,11 @@ class BaseScraper(ABC):
     """
 
     source_name: str
+    fetcher_type: str = "Fetcher"
     source_id: int
     _download_delay_sec: float = 2.0
     _max_retries: int = 3
     _backoff_base_sec: float = 5.0
-    _fetcher: Any | None = None
 
     def __init__(
         self, source_id: int, download_delay_sec: float = 2.0, max_retries: int = 3
@@ -51,14 +52,29 @@ class BaseScraper(ABC):
         self._download_delay_sec = download_delay_sec
         self._max_retries = max_retries
 
-    @property
-    def fetcher(self) -> Any:
-        """Lazy-initialize Scrapling fetcher."""
-        if self._fetcher is None:
-            self._fetcher = FetcherSelector.for_source(
-                self.source_name, getattr(self, "fetcher_type", "StealthyFetcher")
-            )
-        return self._fetcher
+    def fetch_page(self, url: str, **kwargs: Any) -> Any:
+        """Fetch a page using the configured fetcher with retry and ban detection.
+
+        Args:
+            url: URL to fetch.
+            **kwargs: Additional arguments passed to the fetcher.
+
+        Returns:
+            Response object with .text, .bs4, .css(), etc.
+
+        Raises:
+            BanDetectedError: If a ban/challenge is detected.
+            Exception: If fetch fails after retries.
+        """
+        return self._with_retry(
+            lambda: self._fetch_with_ban_check(url, **kwargs)
+        )
+
+    def _fetch_with_ban_check(self, url: str, **kwargs: Any) -> Any:
+        """Fetch URL and check for ban/challenge."""
+        response = FetcherSelector.fetch_url(self.fetcher_type, url, **kwargs)
+        self._detect_ban(response)
+        return response
 
     @abstractmethod
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:

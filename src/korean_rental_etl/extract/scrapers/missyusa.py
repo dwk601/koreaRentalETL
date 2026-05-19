@@ -22,7 +22,7 @@ class MissyusaScraper(BaseScraper):
 
     def crawl_list_pages(self) -> Iterator[dict[str, str]]:
         try:
-            response = self.fetcher.fetch(self._list_url)
+            response = self.fetch_page(self._list_url)
             soup = response.bs4
             items = soup.select(".post_item")
         except Exception:
@@ -47,7 +47,7 @@ class MissyusaScraper(BaseScraper):
             }
 
     def fetch_detail(self, url: str) -> dict[str, object]:
-        response = self.fetcher.fetch(url)
+        response = self.fetch_page(url)
         return {
             "html": response.text,
             "status": getattr(response, "status_code", 200),
