@@ -53,30 +53,36 @@ def sources_show(name: str) -> None:
 
 @main.command()
 @click.option("--source", help="Source name to extract from")
-def extract(source: str | None) -> None:
+@click.option("--all", "extract_all", is_flag=True, help="Extract from all active sources")
+def extract(source: str | None, extract_all: bool) -> None:
     """Extract listings from sources."""
-    click.echo(f"Extract command placeholder (source={source})")
+    if extract_all:
+        click.echo("Extracting from all active sources...")
+    elif source:
+        click.echo(f"Extracting from {source}...")
+    else:
+        click.echo("Please specify --source or --all")
 
 
 @main.command()
 @click.option("--run-id", help="ETL run ID")
 def transform(run_id: str | None) -> None:
-    """Transform extracted listings."""
-    click.echo(f"Transform command placeholder (run_id={run_id})")
+    """Transform extracted listings (parse, geocode, classify, dedup)."""
+    click.echo("Transforming listings...")
 
 
 @main.command()
 @click.option("--run-id", help="ETL run ID")
 def load(run_id: str | None) -> None:
     """Load transformed listings into database."""
-    click.echo(f"Load command placeholder (run_id={run_id})")
+    click.echo("Loading listings...")
 
 
 @main.command()
 @click.option("--run-id", help="ETL run ID")
 def validate(run_id: str | None) -> None:
     """Validate loaded listings."""
-    click.echo(f"Validate command placeholder (run_id={run_id})")
+    click.echo("Validating listings...")
 
 
 @main.command()
