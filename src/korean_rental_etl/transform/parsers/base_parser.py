@@ -1,16 +1,19 @@
 """Base parser for all sources."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class BaseParser(ABC):
     """Abstract base for per-source HTML parsers."""
 
-    def __init__(self, source_name: str):
+    def __init__(self, source_name: str) -> None:
         self.source_name = source_name
 
     @abstractmethod
-    def parse_detail(self, html: str, url: str) -> dict:
+    def parse_detail(self, html: str, url: str) -> dict[str, Any]:
         """Parse detail page HTML.
 
         Returns dict with:

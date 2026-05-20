@@ -87,10 +87,29 @@ def extract(source: str | None, extract_all: bool) -> None:
 
 
 @main.command()
-@click.option("--run-id", help="ETL run ID")
-def transform(run_id: str | None) -> None:
+@click.option("--source", help="Source name to transform")
+@click.option("--all", "transform_all", is_flag=True, help="Transform all active sources")
+@click.option("--limit", type=int, default=500, help="Max rows to process per source")
+def transform(source: str | None, transform_all: bool, limit: int) -> None:
     """Transform extracted listings (parse, geocode, classify, dedup)."""
-    click.echo("Transforming listings...")
+    from korean_rental_etl.transform.pipeline import run
+
+    if not transform_all and not source:
+        click.echo("Error: Please specify --source or --all", err=True)
+        raise SystemExit(1)
+
+    try:
+        if transform_all:
+            click.echo("Transforming all sources...")
+            rows_parsed, rows_failed = run(source_name=None, limit=limit)
+        else:
+            click.echo(f"Transforming {source}...")
+            rows_parsed, rows_failed = run(source_name=source, limit=limit)
+
+        click.echo(f"  ✓ Transformed {rows_parsed} listings, failed {rows_failed}")
+    except Exception as e:
+        click.echo(f"  ✗ Error: {e}", err=True)
+        raise SystemExit(1) from e
 
 
 @main.command()

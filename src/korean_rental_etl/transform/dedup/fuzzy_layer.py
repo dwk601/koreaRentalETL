@@ -61,12 +61,20 @@ def find_duplicates(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 # Check time window: ±7 days
                 if posted_a and posted_b:
                     try:
-                        date_a = datetime.fromisoformat(posted_a.replace("Z", "+00:00")).date()
-                        date_b = datetime.fromisoformat(posted_b.replace("Z", "+00:00")).date()
+                        date_a = (
+                            posted_a.date()
+                            if isinstance(posted_a, datetime)
+                            else datetime.fromisoformat(str(posted_a).replace("Z", "+00:00")).date()
+                        )
+                        date_b = (
+                            posted_b.date()
+                            if isinstance(posted_b, datetime)
+                            else datetime.fromisoformat(str(posted_b).replace("Z", "+00:00")).date()
+                        )
                         days_diff = abs((date_a - date_b).days)
                         if days_diff > TIME_WINDOW_DAYS:
                             continue
-                    except (ValueError, AttributeError):
+                    except (ValueError, AttributeError, TypeError):
                         pass
 
                 text_b = f"{listing_b.get('title_ko', '')} {listing_b.get('rent_monthly_usd', '')}"
@@ -79,11 +87,16 @@ def find_duplicates(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     processed.add(j)
 
             if len(group) > 1:
-                # Pick canonical: earliest posted_at
-                canonical = min(
-                    group,
-                    key=lambda x: x.get("posted_at_utc") or "9999",
-                )
+                # Pick canonical: earliest posted_at (handle datetime, string, or None)
+                def _sort_key(x: dict[str, Any]) -> str:
+                    p = x.get("posted_at_utc")
+                    if p is None:
+                        return "9999"
+                    if isinstance(p, datetime):
+                        return p.isoformat()
+                    return str(p)
+
+                canonical = min(group, key=_sort_key)
                 canonical_id = canonical.get("id", 0)
 
                 for member in group:

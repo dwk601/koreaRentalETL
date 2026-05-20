@@ -45,7 +45,7 @@ with DAG(
 
     transform = BashOperator(
         task_id="transform",
-        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli transform",
+        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli transform --all",
     )
 
     load = BashOperator(
