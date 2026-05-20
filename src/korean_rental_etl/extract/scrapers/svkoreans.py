@@ -18,41 +18,50 @@ class SvkoreansScraper(BaseScraper):
 
     source_name = "svkoreans"
     fetcher_type = "Fetcher"
-
     _list_url = "https://svkoreans.com/rent_housing"
 
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         """Yield listing summaries from the list page."""
         try:
             response = self.fetch_page(self._list_url)
+            selector = response
         except Exception:
-            logger.warning("Could not fetch list page, using fixture fallback")
-            # Fallback for testing: use fixtures
-            yield from self._parse_list_from_fixture()
-            return
+            logger.exception("Could not fetch list page, using fixture fallback")
+            fixture_path = self._fixture_path("list_page_1.html")
+            if not fixture_path.exists():
+                return
+            html = fixture_path.read_text()
+            selector = self.parse_html(html)
 
-        from bs4 import BeautifulSoup
+        # Live site uses li.d-md-table-row with a.na-subject links
+        # Fixture uses table.board_list with a[href*='view'] links
+        # Try live selector first, then fallback to fixture selector
+        anchors = selector.css("li.d-md-table-row a.na-subject")
+        if not anchors.getall():
+            anchors = selector.css("a[href*='view']")
 
-        soup = BeautifulSoup(str(response.html_content), "html.parser")
-        rows = soup.select("table.board_list tr")
-        for row in rows:
-            link = row.select_one("a[href*='view']")
-            if not link:
+        for anchor in anchors:
+            href = anchor.attrib.get("href", "")
+            if not href:
+                continue
+            title = anchor.get_all_text().strip()
+            if not title:
                 continue
 
-            title = link.get_text(strip=True)
-            href = str(link.get("href", ""))
+            # Resolve absolute URL
             if href.startswith("/"):
-                href = f"https://svkoreans.com{href}"
+                full_url = f"https://svkoreans.com{href}"
             elif not href.startswith("http"):
-                href = f"https://svkoreans.com/{href}"
+                full_url = f"https://svkoreans.com/{href}"
+            else:
+                full_url = href
 
-            # Extract listing ID from URL
-            listing_id = href.split("no=")[-1].split("&")[0] if "no=" in href else href
+            # Extract listing ID from URL path (last component)
+            listing_id = full_url.rstrip("/").rsplit("/", 1)[-1]
 
             yield {
-                "url": href,
-                "source_listing_id": listing_id or href,
+                "url": full_url,
+                "source_listing_id": listing_id,
                 "title": title,
             }
 
@@ -64,44 +73,3 @@ class SvkoreansScraper(BaseScraper):
             "status": getattr(response, "status", None) or getattr(response, "status_code", 200),
             "url": url,
         }
-
-    def _parse_list_from_fixture(self) -> Iterator[dict[str, Any]]:
-        """Parse listing links from a fixture HTML file (for testing)."""
-        from pathlib import Path
-
-        fixture = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "tests"
-            / "fixtures"
-            / "html"
-            / "svkoreans"
-            / "list_page_1.html"
-        )
-        if not fixture.exists():
-            logger.warning("No fixture found at %s", fixture)
-            return
-
-        html = fixture.read_text()
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(html, "html.parser")
-        rows = soup.select("table.board_list tr")
-        for row in rows:
-            link = row.select_one("a[href*='view']")
-            if not link:
-                continue
-
-            title = link.get_text(strip=True)
-            href = str(link.get("href", ""))
-            if href.startswith("/"):
-                href = f"https://svkoreans.com{href}"
-            elif not href.startswith("http"):
-                href = f"https://svkoreans.com/{href}"
-
-            listing_id = href.split("no=")[-1].split("&")[0] if "no=" in href else href
-
-            yield {
-                "url": href,
-                "source_listing_id": listing_id or href,
-                "title": title,
-            }
