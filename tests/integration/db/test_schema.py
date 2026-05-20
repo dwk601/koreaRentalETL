@@ -5,25 +5,8 @@ These tests require Docker Compose test stack running:
     pytest tests/integration/db/test_schema.py -v -m integration
 """
 
-import os
-
 import psycopg
 import pytest
-
-
-@pytest.fixture
-def test_conn() -> psycopg.Connection:
-    """Get a connection to the test database."""
-    conninfo = (
-        f"host={os.environ.get('TEST_POSTGRES_HOST', 'localhost')} "
-        f"port={os.environ.get('TEST_POSTGRES_PORT', '15432')} "
-        f"dbname={os.environ.get('TEST_POSTGRES_DB', 'korean_rental_test')} "
-        f"user={os.environ.get('TEST_POSTGRES_USER', 'etl_test')} "
-        f"password={os.environ.get('TEST_POSTGRES_PASSWORD', 'test_password')}"
-    )
-    conn = psycopg.connect(conninfo)
-    yield conn
-    conn.close()
 
 
 @pytest.mark.integration
