@@ -23,7 +23,7 @@ def mark_stale_listings_inactive(days: int = 14) -> int:
             """
             UPDATE public.listings
             SET is_active = false, updated_at = NOW()
-            WHERE is_active = true AND last_seen_at < NOW() - INTERVAL '%s days'
+            WHERE is_active = true AND last_seen_at < NOW() - (%s || ' days')::interval
             """,
             (days,),
         )
@@ -46,7 +46,7 @@ def purge_old_raw_pages(days: int = 90) -> int:
         cur.execute(
             """
             DELETE FROM raw.scraped_pages
-            WHERE fetched_at < NOW() - INTERVAL '%s days'
+            WHERE fetched_at < NOW() - (%s || ' days')::interval
             """,
             (days,),
         )
