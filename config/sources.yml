@@ -47,15 +47,15 @@ sources:
     description: "Korea Daily K-Town rental listings"
 
   - name: radiokorea
-    url: "https://m.radiokorea.com"
-    path: "c_realestate"
-    fetcher: DynamicFetcher
+    url: "https://radiokorea.com"
+    path: "bulletin/bbs/board.php?bo_table=c_realestate"
+    fetcher: Fetcher
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
     robots_txt_obey: true
     status: active
-    description: "Radio Korea real estate (mobile, JS-rendered)"
+    description: "Radio Korea real estate board"
 
   - name: hanintown
     url: "https://hanintown.com"

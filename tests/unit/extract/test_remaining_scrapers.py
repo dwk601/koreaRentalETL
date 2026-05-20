@@ -72,8 +72,16 @@ class TestRadiokoreaScraper:
 
     def test_crawl_list_pages(self, scraper: RadiokoreaScraper) -> None:
         listings = list(scraper.crawl_list_pages())
-        assert len(listings) == 3
-        assert all(listing["url"].startswith("https://m.radiokorea.com/") for listing in listings)
+        assert len(listings) >= 3, f"Expected at least 3 listings, got {len(listings)}"
+        
+        # Verify all required fields
+        for listing in listings:
+            assert "url" in listing
+            assert "source_listing_id" in listing
+            assert "title" in listing
+            assert listing["url"].startswith("https://radiokorea.com/")
+            assert len(listing["source_listing_id"]) > 0
+            assert len(listing["title"]) > 0
 
 
 class TestExtractAll:
