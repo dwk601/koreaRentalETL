@@ -98,7 +98,16 @@ class BaseScraper(ABC):
         raise NotImplementedError
 
     def _detect_ban(self, response: Any) -> None:
-        """Detect ban/challenge responses and raise BanDetectedError."""
+        """Detect ban/challenge responses and raise BanDetectedError.
+
+        Triggers only on hard signals:
+          - HTTP 403 / 429
+          - Cloudflare interstitial markers (cf-browser-verification, cf-chl-bypass,
+            __cf_chl_jschl_tk__, "Just a moment" Turnstile page, "Checking your browser")
+
+        Bare "cloudflare" string is not a signal — it appears in many CDN / asset URLs
+        on legitimate pages.
+        """
         status = getattr(response, "status", None) or getattr(response, "status_code", 0)
         if status in (403, 429):
             raise BanDetectedError(f"HTTP {status} detected for {self.source_name}")
@@ -108,9 +117,15 @@ class BaseScraper(ABC):
         if html is None:
             html = getattr(response, "text", "")
         html_str = str(html) if html else ""
-        if html_str and (
-            "cf-browser-verification" in html_str.lower() or "cloudflare" in html_str.lower()
-        ):
+        lower = html_str.lower()
+        challenge_markers = (
+            "cf-browser-verification",
+            "cf-chl-bypass",
+            "__cf_chl_jschl_tk__",
+            "checking your browser before accessing",
+            'name="cf-turnstile-response"',
+        )
+        if any(m in lower for m in challenge_markers):
             raise BanDetectedError("Cloudflare challenge detected")
 
     def _with_retry(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
@@ -153,7 +168,10 @@ class BaseScraper(ABC):
         Returns:
             Selector object with .css(), ::text, ::attr() support.
         """
-        return Selector(content=html, url=getattr(self, "_list_url", None))
+        list_url = getattr(self, "_list_url", None)
+        if isinstance(list_url, str):
+            return Selector(content=html, url=list_url)
+        return Selector(content=html)
 
     def _fixture_path(self, name: str) -> Path:
         """Resolve fixture file path for this scraper.
