@@ -48,3 +48,41 @@ class TestSave:
 
         result = save(source_id=1, url="https://example.com", html="<html>test</html>")
         assert result is False
+
+    @patch("korean_rental_etl.extract.raw_writer.get_cursor")
+    def test_save_passes_list_page_location(self, mock_get_cursor: MagicMock) -> None:
+        """list_page_location must be persisted as the 6th positional arg."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = {"id": 1}
+        mock_get_cursor.return_value = mock_cursor
+
+        save(
+            source_id=1,
+            url="https://example.com",
+            html="<html>test</html>",
+            http_status=200,
+            list_page_location="LA",
+        )
+        # Inspect the SQL params
+        args, _ = mock_cursor.execute.call_args
+        sql, params = args
+        assert "list_page_location" in sql
+        assert params[-1] == "LA"  # last positional param is list_page_location
+
+    @patch("korean_rental_etl.extract.raw_writer.get_cursor")
+    def test_save_list_page_location_defaults_to_none(
+        self, mock_get_cursor: MagicMock
+    ) -> None:
+        """When omitted, list_page_location is persisted as NULL."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = {"id": 1}
+        mock_get_cursor.return_value = mock_cursor
+
+        save(source_id=1, url="https://example.com", html="<html>test</html>")
+        args, _ = mock_cursor.execute.call_args
+        _, params = args
+        assert params[-1] is None

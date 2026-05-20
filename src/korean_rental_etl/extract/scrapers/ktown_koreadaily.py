@@ -65,11 +65,11 @@ class KtownKoreadailyScraper(BaseScraper):
 
         for listing_id, entry in best.items():
             title = entry["title"] or f"Listing {listing_id}"
-            yield {
-                "url": entry["url"],
-                "source_listing_id": listing_id,
-                "title": title,
-            }
+            yield self._build_listing(
+                url=entry["url"],
+                source_listing_id=listing_id,
+                title=title,
+            )
 
     def fetch_detail(self, url: str) -> dict[str, object]:
         response = self.fetch_page(url)

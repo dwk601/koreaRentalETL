@@ -27,6 +27,7 @@ def save(
     url: str,
     html: str,
     http_status: int | None = None,
+    list_page_location: str | None = None,
 ) -> bool:
     """Save raw HTML to raw.scraped_pages.
 
@@ -37,6 +38,7 @@ def save(
         url: URL that was fetched.
         html: Raw HTML content.
         http_status: HTTP status code of the response.
+        list_page_location: Location signal from list page (e.g., '[LA]' bracket).
 
     Returns:
         True if a new row was inserted, False if it already existed (duplicate).
@@ -46,12 +48,13 @@ def save(
     with get_cursor() as cur:
         cur.execute(
             """
-            INSERT INTO raw.scraped_pages (source_id, url, html_content, content_hash, http_status)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO raw.scraped_pages
+            (source_id, url, html_content, content_hash, http_status, list_page_location)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_id, url, content_hash) DO NOTHING
             RETURNING id
             """,
-            (source_id, url, html, content_hash, http_status),
+            (source_id, url, html, content_hash, http_status, list_page_location),
         )
         result = cur.fetchone()
         inserted = result is not None

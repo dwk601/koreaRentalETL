@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from scrapling import Selector
 
 from korean_rental_etl.extract.fetcher_selector import FetcherSelector
+from korean_rental_etl.text_utils import extract_title_bracket
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -252,6 +253,26 @@ class BaseScraper(ABC):
         """
         return None
 
+    def _build_listing(
+        self, url: str, source_listing_id: str, title: str
+    ) -> dict[str, Any]:
+        """Build a listing dict for crawl_list_pages output.
+
+        Args:
+            url: Listing URL.
+            source_listing_id: Source-specific listing ID.
+            title: Listing title.
+
+        Returns:
+            Dict with url, source_listing_id, title, and location (bracket prefix or '').
+        """
+        return {
+            "url": url,
+            "source_listing_id": source_listing_id,
+            "title": title,
+            "location": extract_title_bracket(title),
+        }
+
     def extract(self) -> tuple[int, int]:
         """Run full extraction for this source.
 
@@ -287,6 +308,7 @@ class BaseScraper(ABC):
                     url=url,
                     html=detail.get("html", ""),
                     http_status=detail.get("status"),
+                    list_page_location=listing.get("location", ""),
                 )
                 if inserted:
                     extracted += 1

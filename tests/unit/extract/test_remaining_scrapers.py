@@ -131,3 +131,35 @@ class TestExtractAll:
             assert len(listings) >= 1, f"{scraper.source_name} has no listings"
             assert all("url" in listing for listing in listings)
             assert all("source_listing_id" in listing for listing in listings)
+
+
+class TestLocationSignal:
+    """Verify all scrapers emit a 'location' field via _build_listing."""
+
+    def test_all_scrapers_emit_location_field(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from korean_rental_etl.extract.scrapers.svkoreans import SvkoreansScraper
+        from korean_rental_etl.text_utils import extract_title_bracket
+
+        scrapers = [
+            SvkoreansScraper(source_id=1),
+            GtksaScraper(source_id=2),
+            MissyusaScraper(source_id=3),
+            KtownKoreadailyScraper(source_id=4),
+            RadiokoreaScraper(source_id=5),
+        ]
+        for scraper in scrapers:
+            _force_fixture(monkeypatch, scraper)
+            listings = list(scraper.crawl_list_pages())
+            assert len(listings) >= 1, f"{scraper.source_name} has no listings"
+            for listing in listings:
+                assert "location" in listing, (
+                    f"{scraper.source_name} listing missing 'location' key: {listing}"
+                )
+                # location must equal the bracket extracted from the title
+                expected = extract_title_bracket(listing["title"])
+                assert listing["location"] == expected, (
+                    f"{scraper.source_name}: location {listing['location']!r} != "
+                    f"bracket {expected!r} for title {listing['title']!r}"
+                )

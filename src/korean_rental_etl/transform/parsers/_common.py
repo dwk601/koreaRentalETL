@@ -1,13 +1,21 @@
 """Shared Korean text parsing helpers."""
 
-import hashlib
 import re
 from datetime import UTC, datetime, timedelta
 
+from korean_rental_etl.extract.raw_writer import compute_content_hash  # noqa: F401
+from korean_rental_etl.text_utils import extract_title_bracket, first_body_line  # noqa: F401
 
-def compute_content_hash(html: str) -> str:
-    """Compute SHA256 hash of HTML content."""
-    return hashlib.sha256(html.encode()).hexdigest()[:16]
+__all__ = [
+    "compute_content_hash",
+    "extract_text",
+    "extract_labelled_field",
+    "extract_body_text",
+    "extract_contact_block",
+    "extract_title_bracket",
+    "first_body_line",
+    "infer_location",
+]
 
 
 def extract_text(element) -> str:
@@ -104,3 +112,101 @@ def extract_contact_block(element) -> str:
     if not element:
         return ""
     return extract_text(element)
+
+
+def extract_labelled_field(text: str, labels: list[str]) -> str:
+    """Extract value after a labelled line in Korean body text.
+
+    Scans line-by-line and returns the value after any of the given labels.
+    Supports both ASCII colon ':' and full-width colon '：'.
+
+    Args:
+        text: Body text to search.
+        labels: List of label strings to match (e.g., ['위치', 'Location']).
+
+    Returns:
+        The value after the label, or empty string if not found.
+    """
+    if not text or not labels:
+        return ""
+
+    for line in text.split("\n"):
+        line = line.strip()
+        for label in labels:
+            # Match both ASCII ':' and full-width '：'
+            for sep in [":", "："]:
+                prefix = f"{label}{sep}"
+                if line.startswith(prefix):
+                    return line[len(prefix) :].strip()
+    return ""
+
+
+def extract_body_text(soup: object, selectors: list[str]) -> str:
+    """Extract clean text from the first matching CSS selector.
+
+    Preserves line breaks from <p> and <br> tags.
+
+    Args:
+        soup: BeautifulSoup object.
+        selectors: List of CSS selectors to try in order.
+
+    Returns:
+        Clean whitespace-collapsed text with line breaks, or empty string if no match.
+    """
+    if not soup or not selectors:
+        return ""
+
+    for selector in selectors:
+        element = soup.select_one(selector)
+        if element:
+            # Extract text preserving paragraph breaks
+            lines = []
+            for child in element.descendants:
+                if isinstance(child, str):
+                    text = child.strip()
+                    if text:
+                        lines.append(text)
+                elif hasattr(child, "name") and child.name in ("p", "br", "div"):
+                    # Check if this is a direct child (not nested)
+                    if child.parent == element or (
+                        hasattr(child.parent, "name") and child.parent.name in ("p", "div")
+                    ):
+                        pass  # Will be handled by text extraction
+            # Simpler approach: get text from each <p> tag separately
+            paragraphs = []
+            for p in element.find_all(["p", "div"], recursive=False):
+                text = extract_text(p)
+                if text:
+                    paragraphs.append(text)
+            if paragraphs:
+                return "\n".join(paragraphs)
+            # Fallback to full text if no paragraphs
+            return extract_text(element)
+    return ""
+
+
+def infer_location(title: str, body: str, labelled: str = "") -> str:
+    """Best-effort location string from labelled, title bracket, or body first line.
+
+    Priority:
+      1. Explicit '위치:' / 'Location:' value if present.
+      2. '[bracket]' tag in title joined with first body line for richer context.
+      3. First body line on its own.
+      4. Title bracket on its own.
+
+    Args:
+        title: Listing title (e.g. 'title_ko').
+        body: Listing body (e.g. 'body_ko').
+        labelled: Pre-extracted labelled value (from extract_labelled_field), if any.
+
+    Returns:
+        A non-empty location string when any signal is available, else ''.
+    """
+    if labelled:
+        return labelled
+    bracket = extract_title_bracket(title)
+    head = first_body_line(body)
+    # If bracket already appears in head, head alone is richer; otherwise combine.
+    if bracket and head and bracket not in head:
+        return f"{bracket} {head}".strip()
+    return head or bracket

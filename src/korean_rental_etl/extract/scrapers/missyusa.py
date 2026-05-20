@@ -66,11 +66,11 @@ class MissyusaScraper(BaseScraper):
             if not entry["title"]:
                 # Need at least one anchor with text per id; skip image-only rows.
                 continue
-            yield {
-                "url": entry["url"],
-                "source_listing_id": listing_id,
-                "title": entry["title"],
-            }
+            yield self._build_listing(
+                url=entry["url"],
+                source_listing_id=listing_id,
+                title=entry["title"],
+            )
 
     def fetch_detail(self, url: str) -> dict[str, object]:
         response = self.fetch_page(url)

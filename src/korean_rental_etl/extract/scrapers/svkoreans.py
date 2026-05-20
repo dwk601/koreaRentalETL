@@ -65,11 +65,11 @@ class SvkoreansScraper(BaseScraper):
             if not listing_id:
                 continue
 
-            yield {
-                "url": full_url,
-                "source_listing_id": listing_id,
-                "title": title,
-            }
+            yield self._build_listing(
+                url=full_url,
+                source_listing_id=listing_id,
+                title=title,
+            )
 
     def fetch_detail(self, url: str) -> dict[str, Any]:
         """Fetch detail page HTML."""

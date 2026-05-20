@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS raw.scraped_pages (
     html_content    TEXT,
     content_hash    VARCHAR(64) NOT NULL,  -- SHA-256
     http_status     INTEGER,
+    list_page_location TEXT,  -- Location signal from list page (e.g., [LA], [애틀랜타])
     fetched_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (source_id, url, content_hash)
 );
@@ -109,7 +110,7 @@ CREATE TABLE IF NOT EXISTS staging.listings_staging (
     errors              JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_staging_source_listing ON staging.listings_staging (source_id, source_listing_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_staging_source_listing ON staging.listings_staging (source_id, source_listing_id);
 CREATE INDEX IF NOT EXISTS idx_staging_content_hash ON staging.listings_staging (content_hash);
 CREATE INDEX IF NOT EXISTS idx_staging_loaded_at ON staging.listings_staging (loaded_at);
 

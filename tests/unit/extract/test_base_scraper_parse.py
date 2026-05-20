@@ -63,3 +63,48 @@ class TestFixturePath:
         path = scraper._fixture_path("list_page_1.html")
         assert "svkoreans" in str(path)
         assert path.exists()
+
+
+class TestBuildListing:
+    """Tests for BaseScraper._build_listing - location signal extraction."""
+
+    @pytest.fixture
+    def scraper(self) -> GtksaScraper:
+        return GtksaScraper(source_id=2)
+
+    def test_build_listing_extracts_bracket_location(self, scraper: GtksaScraper) -> None:
+        listing = scraper._build_listing(
+            url="https://example.com/1",
+            source_listing_id="1",
+            title="[LA] 다운타운 1베드룸 월세",
+        )
+        assert listing == {
+            "url": "https://example.com/1",
+            "source_listing_id": "1",
+            "title": "[LA] 다운타운 1베드룸 월세",
+            "location": "LA",
+        }
+
+    def test_build_listing_korean_bracket(self, scraper: GtksaScraper) -> None:
+        listing = scraper._build_listing(
+            url="https://example.com/2",
+            source_listing_id="2",
+            title="[애틀랜타] 룸메이트 구합니다",
+        )
+        assert listing["location"] == "애틀랜타"
+
+    def test_build_listing_no_bracket(self, scraper: GtksaScraper) -> None:
+        listing = scraper._build_listing(
+            url="https://example.com/3",
+            source_listing_id="3",
+            title="아파트 렌트합니다",
+        )
+        assert listing["location"] == ""
+
+    def test_build_listing_empty_title(self, scraper: GtksaScraper) -> None:
+        listing = scraper._build_listing(
+            url="https://example.com/4",
+            source_listing_id="4",
+            title="",
+        )
+        assert listing["location"] == ""

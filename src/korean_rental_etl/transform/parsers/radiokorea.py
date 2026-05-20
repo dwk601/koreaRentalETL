@@ -1,11 +1,18 @@
 """Radio Korea parser."""
 
+from __future__ import annotations
+
+import re
+from typing import Any
+
 from bs4 import BeautifulSoup
 
 from korean_rental_etl.transform.parsers._common import (
     compute_content_hash,
-    extract_contact_block,
+    extract_body_text,
+    extract_labelled_field,
     extract_text,
+    infer_location,
 )
 from korean_rental_etl.transform.parsers.base_parser import BaseParser
 
@@ -13,32 +20,43 @@ from korean_rental_etl.transform.parsers.base_parser import BaseParser
 class RadiokoreaParser(BaseParser):
     """Parser for m.radiokorea.com/c_realestate."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("radiokorea")
 
-    def parse_detail(self, html: str, url: str) -> dict:
+    def parse_detail(self, html: str, url: str) -> dict[str, Any]:
         """Parse Radio Korea detail page."""
         soup = BeautifulSoup(html, "html.parser")
 
-        source_listing_id = url.split("/")[-1] if "/" in url else "unknown"
+        # Extract listing ID from wr_id query param
+        source_listing_id = ""
+        match = re.search(r"wr_id=(\d+)", url)
+        if match:
+            source_listing_id = match.group(1)
 
-        title_elem = soup.select_one("h1, .title, .post-title")
-        title_ko = extract_text(title_elem) if title_elem else ""
+        # Title from .realestate_view h1
+        title_ko = extract_text(soup.select_one(".realestate_view h1"))
 
-        body_elem = soup.select_one(".post-content, .content, .body")
-        body_ko = extract_text(body_elem) if body_elem else ""
+        # Body from .realestate_view .view_content
+        body_ko = extract_body_text(soup, [".realestate_view .view_content"])
 
-        price_elem = soup.select_one(".price, [class*='price']")
-        raw_price = extract_text(price_elem) if price_elem else ""
+        # Extract labelled fields from body text
+        labelled_location = extract_labelled_field(body_ko, ["위치", "Location"])
+        raw_location = infer_location(title_ko, body_ko, labelled_location)
+        raw_price = "\n".join(
+            [
+                extract_labelled_field(body_ko, ["월세"]),
+                extract_labelled_field(body_ko, ["보증금"]),
+                extract_labelled_field(body_ko, ["전세"]),
+                extract_labelled_field(body_ko, ["Rent"]),
+            ]
+        ).strip()
+        raw_price = "\n".join(line for line in raw_price.split("\n") if line)
 
-        location_elem = soup.select_one(".location, .address, [class*='location']")
-        raw_location = extract_text(location_elem) if location_elem else ""
+        # Date from body text
+        raw_posted_at = extract_labelled_field(body_ko, ["작성일", "Posted", "Date"])
 
-        date_elem = soup.select_one(".date, [class*='date']")
-        raw_posted_at = extract_text(date_elem) if date_elem else ""
-
-        contact_elem = soup.select_one(".contact, .phone, [class*='contact']")
-        contact_block = extract_contact_block(contact_elem)
+        # Contact from labelled field
+        contact_block = extract_labelled_field(body_ko, ["연락처", "이메일", "카카오", "Contact"])
 
         return {
             "title_ko": title_ko,

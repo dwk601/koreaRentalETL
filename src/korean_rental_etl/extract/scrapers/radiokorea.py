@@ -75,11 +75,11 @@ class RadiokoreaScraper(BaseScraper):
                 continue
             listing_id = match.group(1)
 
-            yield {
-                "url": full_url,
-                "source_listing_id": listing_id,
-                "title": title,
-            }
+            yield self._build_listing(
+                url=full_url,
+                source_listing_id=listing_id,
+                title=title,
+            )
 
     def fetch_detail(self, url: str) -> dict[str, object]:
         response = self.fetch_page(url, **self._fetch_kwargs)
