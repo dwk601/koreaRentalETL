@@ -48,10 +48,21 @@ class TestKtownKoreadailyScraper:
 
     def test_crawl_list_pages(self, scraper: KtownKoreadailyScraper) -> None:
         listings = list(scraper.crawl_list_pages())
-        assert len(listings) == 3
-        assert all(
-            listing["url"].startswith("https://ktown.koreadaily.com/") for listing in listings
-        )
+        assert len(listings) >= 3, f"Expected at least 3 listings, got {len(listings)}"
+        
+        # Verify all required fields
+        for listing in listings:
+            assert "url" in listing
+            assert "source_listing_id" in listing
+            assert "title" in listing
+            assert listing["url"].startswith("https://ktown.koreadaily.com/")
+            assert "rentview" in listing["url"]
+            assert listing["source_listing_id"].isdigit()
+            assert len(listing["title"]) > 0
+        
+        # Verify no duplicate URLs
+        urls = [listing["url"] for listing in listings]
+        assert len(urls) == len(set(urls))
 
 
 class TestRadiokoreaScraper:

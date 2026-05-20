@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
 
@@ -20,29 +21,62 @@ class KtownKoreadailyScraper(BaseScraper):
     fetcher_type = "Fetcher"
     _list_url = "https://ktown.koreadaily.com/ad_rent/rentlist"
 
-    def crawl_list_pages(self) -> Iterator[dict[str, str]]:
+    def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         try:
             response = self.fetch_page(self._list_url)
-            from bs4 import BeautifulSoup
-
-            soup = BeautifulSoup(str(response.html_content), "html.parser")
-            links = soup.select(".rent_list a")
+            selector = response
+            is_live = True
         except Exception:
-            logger.warning("Could not fetch list page, using fixture fallback")
-            links = self._links_from_fixture()
+            logger.exception("Could not fetch list page, using fixture fallback")
+            fixture_path = self._fixture_path("list_page_1.html")
+            if not fixture_path.exists():
+                return
+            html = fixture_path.read_text()
+            selector = self.parse_html(html)
+            is_live = False
 
-        for link in links:
-            title = link.get_text(strip=True)
-            href = str(link.get("href", ""))
+        # Deduplicate by ID
+        seen_ids = set()
+        
+        # Try live site selector first (rentview with data param)
+        anchors = selector.css("a[href*='rentview']")
+        if not anchors.getall():
+            # Fallback to fixture selector (view with seq param)
+            anchors = selector.css("a[href*='view']")
+        
+        for anchor in anchors:
+            href = anchor.attrib.get("href", "")
+            if not href:
+                continue
+            
+            # Extract ID from either data= or seq= parameter
+            match = re.search(r"(?:data|seq)=([^&]+)", href)
+            if not match:
+                continue
+            listing_id = match.group(1)
+            
+            # Skip duplicates
+            if listing_id in seen_ids:
+                continue
+            seen_ids.add(listing_id)
+            
+            title = anchor.get_all_text().strip()
+            # For live data, allow empty titles; for fixtures, require non-empty
+            if not is_live and not title:
+                continue
+
+            # Resolve absolute URL
             if href.startswith("/"):
-                href = f"https://ktown.koreadaily.com{href}"
+                full_url = f"https://ktown.koreadaily.com{href}"
             elif not href.startswith("http"):
-                href = f"https://ktown.koreadaily.com/{href}"
-            seq = href.split("seq=")[-1].split("&")[0] if "seq=" in href else href
+                full_url = f"https://ktown.koreadaily.com/{href}"
+            else:
+                full_url = href
+
             yield {
-                "url": href,
-                "source_listing_id": seq or href,
-                "title": title,
+                "url": full_url,
+                "source_listing_id": listing_id,
+                "title": title or f"Listing {listing_id}",
             }
 
     def fetch_detail(self, url: str) -> dict[str, object]:
@@ -52,22 +86,3 @@ class KtownKoreadailyScraper(BaseScraper):
             "status": getattr(response, "status", None) or getattr(response, "status_code", 200),
             "url": url,
         }
-
-    def _links_from_fixture(self) -> list[object]:
-        from pathlib import Path
-
-        from bs4 import BeautifulSoup
-
-        fixture = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "tests"
-            / "fixtures"
-            / "html"
-            / "ktown_koreadaily"
-            / "list_page_1.html"
-        )
-        if not fixture.exists():
-            return []
-        html = fixture.read_text()
-        soup = BeautifulSoup(html, "html.parser")
-        return soup.select(".rent_list a")  # type: ignore[return-value]
