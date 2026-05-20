@@ -31,7 +31,9 @@ class SvkoreansScraper(BaseScraper):
             yield from self._parse_list_from_fixture()
             return
 
-        soup = response.bs4
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(str(response.html_content), "html.parser")
         rows = soup.select("table.board_list tr")
         for row in rows:
             link = row.select_one("a[href*='view']")
@@ -58,8 +60,8 @@ class SvkoreansScraper(BaseScraper):
         """Fetch detail page HTML."""
         response = self.fetch_page(url)
         return {
-            "html": response.text,
-            "status": getattr(response, "status_code", 200),
+            "html": str(response.html_content),
+            "status": getattr(response, "status", None) or getattr(response, "status_code", 200),
             "url": url,
         }
 

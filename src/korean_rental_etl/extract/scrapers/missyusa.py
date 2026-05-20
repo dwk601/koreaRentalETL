@@ -23,7 +23,9 @@ class MissyusaScraper(BaseScraper):
     def crawl_list_pages(self) -> Iterator[dict[str, str]]:
         try:
             response = self.fetch_page(self._list_url)
-            soup = response.bs4
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(str(response.html_content), "html.parser")
             items = soup.select(".post_item")
         except Exception:
             logger.warning("Could not fetch list page, using fixture fallback")
@@ -49,8 +51,8 @@ class MissyusaScraper(BaseScraper):
     def fetch_detail(self, url: str) -> dict[str, object]:
         response = self.fetch_page(url)
         return {
-            "html": response.text,
-            "status": getattr(response, "status_code", 200),
+            "html": str(response.html_content),
+            "status": getattr(response, "status", None) or getattr(response, "status_code", 200),
             "url": url,
         }
 

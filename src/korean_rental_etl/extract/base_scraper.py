@@ -6,7 +6,10 @@ import hashlib
 import logging
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from scrapling import Selector
 
 from korean_rental_etl.extract.fetcher_selector import FetcherSelector
 
@@ -96,11 +99,18 @@ class BaseScraper(ABC):
 
     def _detect_ban(self, response: Any) -> None:
         """Detect ban/challenge responses and raise BanDetectedError."""
-        status = getattr(response, "status_code", None) or getattr(response, "status", 0)
+        status = getattr(response, "status", None) or getattr(response, "status_code", 0)
         if status in (403, 429):
             raise BanDetectedError(f"HTTP {status} detected for {self.source_name}")
-        text = getattr(response, "text", "")
-        if text and ("cf-browser-verification" in text.lower() or "cloudflare" in text.lower()):
+        # scrapling 0.4.x: full HTML body lives on .html_content (TextHandler).
+        # .text returns element text only and is empty at the document root.
+        html = getattr(response, "html_content", None)
+        if html is None:
+            html = getattr(response, "text", "")
+        html_str = str(html) if html else ""
+        if html_str and (
+            "cf-browser-verification" in html_str.lower() or "cloudflare" in html_str.lower()
+        ):
             raise BanDetectedError("Cloudflare challenge detected")
 
     def _with_retry(self, fn: Any, *args: Any, **kwargs: Any) -> Any:
@@ -133,6 +143,35 @@ class BaseScraper(ABC):
     def _delay(self) -> None:
         """Sleep for the configured download delay."""
         time.sleep(self._download_delay_sec)
+
+    def parse_html(self, html: str) -> Selector:
+        """Parse HTML string into a Selector for native scrapling API usage.
+
+        Args:
+            html: HTML content as string.
+
+        Returns:
+            Selector object with .css(), ::text, ::attr() support.
+        """
+        return Selector(content=html, url=getattr(self, "_list_url", None))
+
+    def _fixture_path(self, name: str) -> Path:
+        """Resolve fixture file path for this scraper.
+
+        Args:
+            name: Fixture filename (e.g., 'list_page_1.html').
+
+        Returns:
+            Path to fixture file under tests/fixtures/html/<source_name>/.
+        """
+        return (
+            Path(__file__).parent.parent.parent.parent
+            / "tests"
+            / "fixtures"
+            / "html"
+            / self.source_name
+            / name
+        )
 
     def _within_cutoff(self, post_date: Any) -> bool:
         """Check if a post date is within the cutoff window.
