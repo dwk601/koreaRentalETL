@@ -253,9 +253,7 @@ class BaseScraper(ABC):
         """
         return None
 
-    def _build_listing(
-        self, url: str, source_listing_id: str, title: str
-    ) -> dict[str, Any]:
+    def _build_listing(self, url: str, source_listing_id: str, title: str) -> dict[str, Any]:
         """Build a listing dict for crawl_list_pages output.
 
         Args:

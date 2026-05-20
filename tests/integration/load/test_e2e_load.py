@@ -1,6 +1,7 @@
 """Integration tests for end-to-end load pipeline."""
 
 from datetime import UTC, datetime, timedelta
+
 import psycopg
 import pytest
 
@@ -16,6 +17,7 @@ class TestE2ELoadIntegration:
     def use_dict_row(self, test_conn: psycopg.Connection):
         """Set connection's row factory to dict_row for all assertions."""
         from psycopg.rows import dict_row
+
         test_conn.row_factory = dict_row
 
     def _build_staging_row(self, source_listing_id: str, rent: float = 1200.0) -> dict:
@@ -73,7 +75,9 @@ class TestE2ELoadIntegration:
 
         # Verify etl_runs audit entry
         with test_conn.cursor() as cur:
-            cur.execute("SELECT * FROM audit.etl_runs WHERE task_id = 'load' ORDER BY id DESC LIMIT 1")
+            cur.execute(
+                "SELECT * FROM audit.etl_runs WHERE task_id = 'load' ORDER BY id DESC LIMIT 1"
+            )
             run = cur.fetchone()
             assert run is not None
             assert run["status"] == "success"
@@ -89,7 +93,9 @@ class TestE2ELoadIntegration:
         load_from_staging()
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT id, created_at FROM public.listings WHERE source_listing_id = 'e2e_list_idempotent'")
+            cur.execute(
+                "SELECT id, created_at FROM public.listings WHERE source_listing_id = 'e2e_list_idempotent'"
+            )
             first_record = cur.fetchone()
             assert first_record is not None
 
@@ -101,11 +107,15 @@ class TestE2ELoadIntegration:
         assert (loaded, failed) == (1, 0)
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT * FROM public.listings WHERE source_listing_id = 'e2e_list_idempotent'")
+            cur.execute(
+                "SELECT * FROM public.listings WHERE source_listing_id = 'e2e_list_idempotent'"
+            )
             records = cur.fetchall()
             assert len(records) == 1  # Still exactly 1 record (idempotent upsert!)
             assert records[0]["id"] == first_record["id"]
-            assert records[0]["created_at"] == first_record["created_at"]  # created_at remains unchanged
+            assert (
+                records[0]["created_at"] == first_record["created_at"]
+            )  # created_at remains unchanged
 
     def test_load_advances_last_seen_at(self, test_conn: psycopg.Connection):
         """Verify that a second load advances last_seen_at when the row is seen again."""
@@ -128,7 +138,9 @@ class TestE2ELoadIntegration:
         load_from_staging()
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT last_seen_at FROM public.listings WHERE source_listing_id = 'e2e_list_advance'")
+            cur.execute(
+                "SELECT last_seen_at FROM public.listings WHERE source_listing_id = 'e2e_list_advance'"
+            )
             result = cur.fetchone()
             assert result is not None
             # last_seen_at should be advanced to a very recent timestamp (larger than yesterday)

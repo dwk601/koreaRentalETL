@@ -14,9 +14,16 @@ class TestCleanupIntegration:
     def use_dict_row(self, test_conn: psycopg.Connection):
         """Set connection's row factory to dict_row for all assertions."""
         from psycopg.rows import dict_row
+
         test_conn.row_factory = dict_row
 
-    def _insert_listing(self, test_conn: psycopg.Connection, source_listing_id: str, last_seen_days_ago: int, is_active: bool = True):
+    def _insert_listing(
+        self,
+        test_conn: psycopg.Connection,
+        source_listing_id: str,
+        last_seen_days_ago: int,
+        is_active: bool = True,
+    ):
         """Helper to insert a listing with a custom last_seen_at timestamp."""
         with test_conn.cursor() as cur:
             cur.execute(
@@ -91,7 +98,9 @@ class TestCleanupIntegration:
         assert count == 1
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) as count FROM raw.scraped_pages WHERE url = 'https://old.com'")
+            cur.execute(
+                "SELECT COUNT(*) as count FROM raw.scraped_pages WHERE url = 'https://old.com'"
+            )
             assert cur.fetchone()["count"] == 0
 
     def test_purge_preserves_recent_raw_pages(self, test_conn: psycopg.Connection):
@@ -102,7 +111,9 @@ class TestCleanupIntegration:
         assert count == 0
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) as count FROM raw.scraped_pages WHERE url = 'https://recent.com'")
+            cur.execute(
+                "SELECT COUNT(*) as count FROM raw.scraped_pages WHERE url = 'https://recent.com'"
+            )
             assert cur.fetchone()["count"] == 1
 
     def test_purge_returns_count(self, test_conn: psycopg.Connection):

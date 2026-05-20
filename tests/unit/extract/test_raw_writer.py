@@ -72,9 +72,7 @@ class TestSave:
         assert params[-1] == "LA"  # last positional param is list_page_location
 
     @patch("korean_rental_etl.extract.raw_writer.get_cursor")
-    def test_save_list_page_location_defaults_to_none(
-        self, mock_get_cursor: MagicMock
-    ) -> None:
+    def test_save_list_page_location_defaults_to_none(self, mock_get_cursor: MagicMock) -> None:
         """When omitted, list_page_location is persisted as NULL."""
         mock_cursor = MagicMock()
         mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)

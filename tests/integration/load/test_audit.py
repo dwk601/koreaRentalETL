@@ -1,7 +1,7 @@
 """Integration tests for audit module."""
 
-import time
 from datetime import UTC, datetime, timedelta
+
 import psycopg
 import pytest
 
@@ -15,6 +15,7 @@ class TestAuditIntegration:
     @pytest.fixture(autouse=True)
     def use_dict_row(self, test_conn: psycopg.Connection):
         from psycopg.rows import dict_row
+
         test_conn.row_factory = dict_row
 
     def test_start_run_creates_record_with_running_status(self, test_conn: psycopg.Connection):
@@ -93,7 +94,10 @@ class TestAuditIntegration:
 
         # Verify duration
         with test_conn.cursor() as cur:
-            cur.execute("SELECT started_at, finished_at, duration_sec FROM audit.etl_runs WHERE id = %s", (run_db_id,))
+            cur.execute(
+                "SELECT started_at, finished_at, duration_sec FROM audit.etl_runs WHERE id = %s",
+                (run_db_id,),
+            )
             row = cur.fetchone()
             assert row is not None
             expected_duration = (row["finished_at"] - row["started_at"]).total_seconds()
@@ -117,7 +121,9 @@ class TestAuditIntegration:
 
         # Verify database has the failure details
         with test_conn.cursor() as cur:
-            cur.execute("SELECT status, error_message FROM audit.etl_runs WHERE id = %s", (run_db_id,))
+            cur.execute(
+                "SELECT status, error_message FROM audit.etl_runs WHERE id = %s", (run_db_id,)
+            )
             row = cur.fetchone()
             assert row is not None
             assert row["status"] == "failed"

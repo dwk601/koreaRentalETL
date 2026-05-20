@@ -136,9 +136,7 @@ class TestExtractAll:
 class TestLocationSignal:
     """Verify all scrapers emit a 'location' field via _build_listing."""
 
-    def test_all_scrapers_emit_location_field(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_all_scrapers_emit_location_field(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from korean_rental_etl.extract.scrapers.svkoreans import SvkoreansScraper
         from korean_rental_etl.text_utils import extract_title_bracket
 

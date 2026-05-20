@@ -1,6 +1,7 @@
 """Shared pytest configuration and fixtures for integration tests."""
 
 import os
+
 import psycopg
 import pytest
 
@@ -57,7 +58,7 @@ def clean_db(test_conn: psycopg.Connection):
         # We do NOT truncate public.sources as it contains vital seeded data.
         cur.execute(
             """
-            TRUNCATE TABLE 
+            TRUNCATE TABLE
                 audit.etl_runs,
                 public.listings,
                 staging.listings_staging,

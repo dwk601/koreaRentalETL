@@ -11,9 +11,10 @@ Discovered Bugs & Design Notes for Follow-Up:
    is completely unused in the function body.
 
 3. `cleanup_interval_parameterization`:
-   cleanup.py uses 'INTERVAL %s days' inside SQL query string literals. Psycopg
+   cleanup.py used 'INTERVAL %s days' inside SQL query string literals. Psycopg
    does not parameterize variables inside string literals, which leads to SQL syntax
-   errors. Gated on Task 4 results.
+   errors. This was successfully confirmed during Task 4 and resolved inline using
+   the parameter-safe pattern: NOW() - (%s || ' days')::interval.
 """
 
 import psycopg
@@ -31,9 +32,12 @@ class TestUpserterIntegration:
     def use_dict_row(self, test_conn: psycopg.Connection):
         """Set connection's row factory to dict_row for all assertions."""
         from psycopg.rows import dict_row
+
         test_conn.row_factory = dict_row
 
-    def _build_staging_row(self, source_id: int, source_listing_id: str, rent: float = 1200.0) -> dict:
+    def _build_staging_row(
+        self, source_id: int, source_listing_id: str, rent: float = 1200.0
+    ) -> dict:
         """Helper to build a minimum staging row compatible with schema and staging_writer."""
         return {
             "source_id": source_id,
@@ -101,7 +105,9 @@ class TestUpserterIntegration:
         upsert_batch([row1], run_db_id=123)
 
         with test_conn.cursor() as cur:
-            cur.execute("SELECT id, first_seen_at, last_seen_at, updated_at FROM public.listings WHERE source_listing_id = 'list_conflict'")
+            cur.execute(
+                "SELECT id, first_seen_at, last_seen_at, updated_at FROM public.listings WHERE source_listing_id = 'list_conflict'"
+            )
             first_record = cur.fetchone()
             assert first_record is not None
 
