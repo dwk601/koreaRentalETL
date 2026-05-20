@@ -1,8 +1,10 @@
-"""Tests for svkoreans scraper using HTML fixtures."""
+"""Tests for svkoreans scraper using HTML fixtures (offline)."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,30 +15,41 @@ FIXTURES_DIR = (
 )
 
 
+def _force_fixture(monkeypatch: pytest.MonkeyPatch, scraper: Any) -> None:
+    def _raise(*_: Any, **__: Any) -> None:
+        raise RuntimeError("network disabled in unit tests")
+
+    monkeypatch.setattr(scraper, "fetch_page", _raise)
+
+
 class TestSvkoreansScraper:
     @pytest.fixture
-    def scraper(self) -> SvkoreansScraper:
-        return SvkoreansScraper(source_id=1)
+    def scraper(self, monkeypatch: pytest.MonkeyPatch) -> SvkoreansScraper:
+        s = SvkoreansScraper(source_id=1)
+        _force_fixture(monkeypatch, s)
+        return s
 
     def test_crawl_list_pages_from_fixture(self, scraper: SvkoreansScraper) -> None:
         listings = list(scraper.crawl_list_pages())
         assert len(listings) >= 3, f"Expected at least 3 listings, got {len(listings)}"
 
-        # Check all listings have required fields
+        url_pattern = re.compile(r"^https://svkoreans\.com/rent_housing/\d+$")
+        korean_pattern = re.compile(r"[\uac00-\ud7af]")
         for listing in listings:
             assert "url" in listing
             assert "source_listing_id" in listing
             assert "title" in listing
-            assert listing["url"].startswith("https://svkoreans.com/")
+            assert url_pattern.match(listing["url"]), f"Bad URL: {listing['url']}"
             assert listing["source_listing_id"].isdigit()
             assert len(listing["title"]) > 0
+            assert korean_pattern.search(listing["title"]), (
+                f"Title should contain Korean characters: {listing['title']!r}"
+            )
 
     def test_listing_urls_are_absolute(self, scraper: SvkoreansScraper) -> None:
         listings = list(scraper.crawl_list_pages())
         for listing in listings:
-            assert listing["url"].startswith("http")
-            # URL can be either /rent_housing/view?no=X or /rent_housing/ID format
-            assert "rent_housing" in listing["url"]
+            assert listing["url"].startswith("https://svkoreans.com/rent_housing/")
 
     def test_listing_ids_unique(self, scraper: SvkoreansScraper) -> None:
         listings = list(scraper.crawl_list_pages())
