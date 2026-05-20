@@ -25,8 +25,8 @@ sources:
     description: "GTKSA rental board"
 
   - name: missyusa
-    url: "https://missyusa.com"
-    path: "town9"
+    url: "https://www.missyusa.com"
+    path: "mainpage/boards/board_list.asp?id=town9&section=town"
     fetcher: StealthyFetcher
     schedule: "0 */4 * * *"
     download_delay_sec: 2.0

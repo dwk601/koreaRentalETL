@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
 
@@ -14,37 +15,68 @@ logger = logging.getLogger(__name__)
 
 
 class MissyusaScraper(BaseScraper):
-    """Scraper for missyusa.com/town9."""
+    """Scraper for www.missyusa.com/mainpage/boards/board_list.asp?id=town9&section=town."""
 
     source_name = "missyusa"
     fetcher_type = "StealthyFetcher"
-    _list_url = "https://missyusa.com/town9"
+    _list_url = "https://www.missyusa.com/mainpage/boards/board_list.asp?id=town9&section=town"
 
-    def crawl_list_pages(self) -> Iterator[dict[str, str]]:
+    def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         try:
             response = self.fetch_page(self._list_url)
-            from bs4 import BeautifulSoup
-
-            soup = BeautifulSoup(str(response.html_content), "html.parser")
-            items = soup.select(".post_item")
+            selector = response
         except Exception:
-            logger.warning("Could not fetch list page, using fixture fallback")
-            items = self._items_from_fixture()
+            logger.exception("Could not fetch list page, using fixture fallback")
+            fixture_path = self._fixture_path("list_page_1.html")
+            if not fixture_path.exists():
+                return
+            html = fixture_path.read_text()
+            selector = self.parse_html(html)
 
-        for item in items:
-            link = item.select_one("a")
-            if not link:
+        # Deduplicate by idx parameter
+        seen_ids = set()
+        
+        # Try live site selector first (a[href*='board_read.asp'])
+        # Fallback to fixture selector (a[href*='view'])
+        anchors = selector.css("a[href*='board_read.asp']")
+        if not anchors.getall():
+            anchors = selector.css("a[href*='view']")
+        
+        for anchor in anchors:
+            href = anchor.attrib.get("href", "")
+            if not href:
                 continue
-            title = link.get_text(strip=True)
-            href = str(link.get("href", ""))
+            
+            title = anchor.get_all_text().strip()
+            if not title:
+                continue
+            
+            # Extract ID from either idx= (live) or id= (fixture) parameter
+            # Prioritize idx= over id=
+            match = re.search(r"idx=([^&]+)", href)
+            if not match:
+                match = re.search(r"id=([^&]+)", href)
+            if not match:
+                continue
+            listing_id = match.group(1)
+            
+            # Skip duplicates
+            if listing_id in seen_ids:
+                continue
+            seen_ids.add(listing_id)
+
+            # Resolve absolute URL
             if href.startswith("/"):
-                href = f"https://missyusa.com{href}"
-            elif not href.startswith("http"):
-                href = f"https://missyusa.com/{href}"
-            item_id = href.split("id=")[-1].split("&")[0] if "id=" in href else href
+                full_url = f"https://www.missyusa.com{href}"
+            elif href.startswith("http"):
+                full_url = href
+            else:
+                # Relative URL - resolve against list URL
+                full_url = f"https://www.missyusa.com/mainpage/boards/{href}"
+
             yield {
-                "url": href,
-                "source_listing_id": item_id or href,
+                "url": full_url,
+                "source_listing_id": listing_id,
                 "title": title,
             }
 
@@ -55,22 +87,3 @@ class MissyusaScraper(BaseScraper):
             "status": getattr(response, "status", None) or getattr(response, "status_code", 200),
             "url": url,
         }
-
-    def _items_from_fixture(self) -> list[object]:
-        from pathlib import Path
-
-        from bs4 import BeautifulSoup
-
-        fixture = (
-            Path(__file__).parent.parent.parent.parent.parent
-            / "tests"
-            / "fixtures"
-            / "html"
-            / "missyusa"
-            / "list_page_1.html"
-        )
-        if not fixture.exists():
-            return []
-        html = fixture.read_text()
-        soup = BeautifulSoup(html, "html.parser")
-        return soup.select(".post_item")  # type: ignore[return-value]
