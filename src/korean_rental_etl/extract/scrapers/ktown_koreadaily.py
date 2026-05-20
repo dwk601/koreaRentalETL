@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class KtownKoreadailyScraper(BaseScraper):
-    """Scraper for ktown.koreadaily.com/ad_rent/rentlist."""
+    """Scraper for ktown.koreadaily.com/ad_rent/rentlist.
+
+    Each rental listing on the live page is reachable via
+    ``a[href*='/ad_rent/rentview?data=']``. The same listing typically appears
+    twice per row (image anchor + ``.title2`` text anchor), so we deduplicate
+    by ``data`` query param and prefer the anchor whose text is non-empty.
+    """
 
     source_name = "ktown_koreadaily"
     fetcher_type = "Fetcher"
@@ -25,7 +31,6 @@ class KtownKoreadailyScraper(BaseScraper):
         try:
             response = self.fetch_page(self._list_url)
             selector = response
-            is_live = True
         except Exception:
             logger.exception("Could not fetch list page, using fixture fallback")
             fixture_path = self._fixture_path("list_page_1.html")
@@ -33,50 +38,37 @@ class KtownKoreadailyScraper(BaseScraper):
                 return
             html = fixture_path.read_text()
             selector = self.parse_html(html)
-            is_live = False
 
-        # Deduplicate by ID
-        seen_ids = set()
-        
-        # Try live site selector first (rentview with data param)
-        anchors = selector.css("a[href*='rentview']")
-        if not anchors.getall():
-            # Fallback to fixture selector (view with seq param)
-            anchors = selector.css("a[href*='view']")
-        
-        for anchor in anchors:
+        # First pass: collect best title per listing_id (image anchors have empty text).
+        best: dict[str, dict[str, str]] = {}
+        for anchor in selector.css("a[href*='/ad_rent/rentview?data=']"):
             href = anchor.attrib.get("href", "")
             if not href:
                 continue
-            
-            # Extract ID from either data= or seq= parameter
-            match = re.search(r"(?:data|seq)=([^&]+)", href)
+            match = re.search(r"data=([^&]+)", href)
             if not match:
                 continue
             listing_id = match.group(1)
-            
-            # Skip duplicates
-            if listing_id in seen_ids:
-                continue
-            seen_ids.add(listing_id)
-            
             title = anchor.get_all_text().strip()
-            # For live data, allow empty titles; for fixtures, require non-empty
-            if not is_live and not title:
-                continue
 
-            # Resolve absolute URL
-            if href.startswith("/"):
-                full_url = f"https://ktown.koreadaily.com{href}"
-            elif not href.startswith("http"):
-                full_url = f"https://ktown.koreadaily.com/{href}"
-            else:
-                full_url = href
+            full_url = selector.urljoin(href) if hasattr(selector, "urljoin") else href
+            if not full_url.startswith("http"):
+                full_url = (
+                    f"https://ktown.koreadaily.com{href}"
+                    if href.startswith("/")
+                    else f"https://ktown.koreadaily.com/{href}"
+                )
 
+            existing = best.get(listing_id)
+            if existing is None or (not existing["title"] and title):
+                best[listing_id] = {"url": full_url, "title": title}
+
+        for listing_id, entry in best.items():
+            title = entry["title"] or f"Listing {listing_id}"
             yield {
-                "url": full_url,
+                "url": entry["url"],
                 "source_listing_id": listing_id,
-                "title": title or f"Listing {listing_id}",
+                "title": title,
             }
 
     def fetch_detail(self, url: str) -> dict[str, object]:

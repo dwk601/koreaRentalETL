@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class GtksaScraper(BaseScraper):
-    """Scraper for gtksa.net/bbs/board.php?bo_table=rent."""
+    """Scraper for gtksa.net/bbs/board.php?bo_table=rent.
+
+    The board renders each row as ``div.bo_tit > a[href*='wr_id']``. The
+    anchor's ``href`` is already absolute on the live site, so we still call
+    ``Selector.urljoin`` defensively for fixture content.
+    """
 
     source_name = "gtksa"
     fetcher_type = "Fetcher"
@@ -33,7 +38,7 @@ class GtksaScraper(BaseScraper):
             html = fixture_path.read_text()
             selector = self.parse_html(html)
 
-        for anchor in selector.css("a[href*='wr_id']"):
+        for anchor in selector.css("div.bo_tit > a[href*='wr_id']"):
             href = anchor.attrib.get("href", "")
             if not href:
                 continue
@@ -41,18 +46,18 @@ class GtksaScraper(BaseScraper):
             if not title:
                 continue
 
-            # Resolve absolute URL
-            full_url = self._list_url if not href.startswith("http") else href
-            if href.startswith("/"):
-                full_url = f"https://gtksa.net{href}"
-            elif not href.startswith("http"):
-                full_url = f"https://gtksa.net/{href}"
-            else:
-                full_url = href
+            full_url = selector.urljoin(href) if hasattr(selector, "urljoin") else href
+            if not full_url.startswith("http"):
+                full_url = (
+                    f"https://gtksa.net{href}"
+                    if href.startswith("/")
+                    else f"https://gtksa.net/{href}"
+                )
 
-            # Extract wr_id from URL
             match = re.search(r"wr_id=(\d+)", full_url)
-            wr_id = match.group(1) if match else full_url
+            if not match:
+                continue
+            wr_id = match.group(1)
 
             yield {
                 "url": full_url,

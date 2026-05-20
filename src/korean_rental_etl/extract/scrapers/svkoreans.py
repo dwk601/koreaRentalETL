@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
@@ -14,7 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class SvkoreansScraper(BaseScraper):
-    """Scraper for svkoreans.com/rent_housing."""
+    """Scraper for svkoreans.com/rent_housing.
+
+    Live DOM is a Bootstrap responsive table:
+        ``li.d-md-table-row > a.na-subject`` with absolute hrefs of the form
+        ``https://svkoreans.com/rent_housing/<id>``.
+
+    The anchor wraps decorative spans (``.na-icon``, ``.na-bar``) plus the
+    title text, so we use ``get_all_text()`` for the visible string.
+    """
 
     source_name = "svkoreans"
     fetcher_type = "Fetcher"
@@ -33,14 +42,7 @@ class SvkoreansScraper(BaseScraper):
             html = fixture_path.read_text()
             selector = self.parse_html(html)
 
-        # Live site uses li.d-md-table-row with a.na-subject links
-        # Fixture uses table.board_list with a[href*='view'] links
-        # Try live selector first, then fallback to fixture selector
-        anchors = selector.css("li.d-md-table-row a.na-subject")
-        if not anchors.getall():
-            anchors = selector.css("a[href*='view']")
-
-        for anchor in anchors:
+        for anchor in selector.css("li.d-md-table-row a.na-subject"):
             href = anchor.attrib.get("href", "")
             if not href:
                 continue
@@ -48,16 +50,20 @@ class SvkoreansScraper(BaseScraper):
             if not title:
                 continue
 
-            # Resolve absolute URL
-            if href.startswith("/"):
-                full_url = f"https://svkoreans.com{href}"
-            elif not href.startswith("http"):
-                full_url = f"https://svkoreans.com/{href}"
-            else:
-                full_url = href
+            full_url = selector.urljoin(href) if hasattr(selector, "urljoin") else href
+            if not full_url.startswith("http"):
+                full_url = (
+                    f"https://svkoreans.com{href}"
+                    if href.startswith("/")
+                    else f"https://svkoreans.com/{href}"
+                )
 
-            # Extract listing ID from URL path (last component)
+            # ID = path tail (e.g. .../rent_housing/1631 -> "1631")
             listing_id = full_url.rstrip("/").rsplit("/", 1)[-1]
+            # Strip query/fragment if present
+            listing_id = re.split(r"[?#]", listing_id, maxsplit=1)[0]
+            if not listing_id:
+                continue
 
             yield {
                 "url": full_url,
