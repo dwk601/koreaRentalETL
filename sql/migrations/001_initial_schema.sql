@@ -178,7 +178,7 @@ CREATE INDEX IF NOT EXISTS idx_listings_is_active ON public.listings (is_active)
 CREATE INDEX IF NOT EXISTS idx_listings_posted_at ON public.listings (posted_at_utc);
 CREATE INDEX IF NOT EXISTS idx_listings_last_seen ON public.listings (last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_listings_geo_point ON public.listings USING GIST (geo_point);
-CREATE INDEX IF NOT EXISTS idx_listings_korean_fts ON public.listings USING GIN ((title_ko || ' ' || body_ko || ' ' || address_raw) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_listings_korean_fts ON public.listings USING GIN ((COALESCE(title_ko,'') || ' ' || COALESCE(body_ko,'') || ' ' || COALESCE(address_raw,'')) gin_trgm_ops);
 
 -- ============================================================
 -- Audit table for ETL runs

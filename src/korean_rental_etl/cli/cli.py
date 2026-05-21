@@ -54,10 +54,13 @@ def sources_show(name: str) -> None:
 @main.command()
 @click.option("--source", help="Source name to extract from")
 @click.option("--all", "extract_all", is_flag=True, help="Extract from all active sources")
-def extract(source: str | None, extract_all: bool) -> None:
+@click.option("--dag-id", help="Airflow DAG ID")
+@click.option("--run-id", help="Airflow run ID")
+def extract(source: str | None, extract_all: bool, dag_id: str | None, run_id: str | None) -> None:
     """Extract listings from sources."""
     from korean_rental_etl.extract.scraper_factory import ScraperFactory
     from korean_rental_etl.extract.source_config import active_sources, get_source, load_sources
+    from korean_rental_etl.transform.pipeline import get_source_id_by_name
 
     config = load_sources()
 
@@ -79,18 +82,28 @@ def extract(source: str | None, extract_all: bool) -> None:
     for src_config in sources_to_extract:
         try:
             click.echo(f"Extracting from {src_config.name}...")
-            scraper = ScraperFactory.create(src_config, source_id=1)
-            extracted, skipped = scraper.extract()
+            source_id = get_source_id_by_name(src_config.name)
+            scraper = ScraperFactory.create(src_config, source_id=source_id)
+            extracted, skipped = scraper.extract(dag_id=dag_id, run_id=run_id)
             click.echo(f"  ✓ Extracted {extracted} listings, skipped {skipped}")
         except Exception as e:
             click.echo(f"  ✗ Error: {e}", err=True)
+            raise SystemExit(1) from e
 
 
 @main.command()
 @click.option("--source", help="Source name to transform")
 @click.option("--all", "transform_all", is_flag=True, help="Transform all active sources")
 @click.option("--limit", type=int, default=500, help="Max rows to process per source")
-def transform(source: str | None, transform_all: bool, limit: int) -> None:
+@click.option("--dag-id", help="Airflow DAG ID")
+@click.option("--run-id", help="Airflow run ID")
+def transform(
+    source: str | None,
+    transform_all: bool,
+    limit: int,
+    dag_id: str | None,
+    run_id: str | None,
+) -> None:
     """Transform extracted listings (parse, geocode, classify, dedup)."""
     from korean_rental_etl.transform.pipeline import run
 
@@ -101,10 +114,14 @@ def transform(source: str | None, transform_all: bool, limit: int) -> None:
     try:
         if transform_all:
             click.echo("Transforming all sources...")
-            rows_parsed, rows_failed = run(source_name=None, limit=limit)
+            rows_parsed, rows_failed = run(
+                source_name=None, limit=limit, dag_id=dag_id, run_id=run_id
+            )
         else:
             click.echo(f"Transforming {source}...")
-            rows_parsed, rows_failed = run(source_name=source, limit=limit)
+            rows_parsed, rows_failed = run(
+                source_name=source, limit=limit, dag_id=dag_id, run_id=run_id
+            )
 
         click.echo(f"  ✓ Transformed {rows_parsed} listings, failed {rows_failed}")
     except Exception as e:
@@ -113,23 +130,131 @@ def transform(source: str | None, transform_all: bool, limit: int) -> None:
 
 
 @main.command()
-@click.option("--run-id", help="ETL run ID")
-def load(run_id: str | None) -> None:
+@click.option("--source", help="Source name to load")
+@click.option("--dag-id", help="Airflow DAG ID")
+@click.option("--run-id", help="Airflow run ID")
+def load(source: str | None, dag_id: str | None, run_id: str | None) -> None:
     """Load transformed listings into database."""
-    click.echo("Loading listings...")
+    from korean_rental_etl.load.upserter import load_from_staging
+    from korean_rental_etl.transform.pipeline import get_source_id_by_name
+
+    source_id = None
+    if source:
+        try:
+            source_id = get_source_id_by_name(source)
+        except Exception as e:
+            click.echo(f"Error: {e}", err=True)
+            raise SystemExit(1) from e
+
+    try:
+        click.echo("Loading listings...")
+        loaded, failed = load_from_staging(source_id=source_id, dag_id=dag_id, run_id=run_id)
+        click.echo(f"  ✓ Loaded {loaded} listings, failed {failed}")
+    except Exception as e:
+        click.echo(f"  ✗ Error: {e}", err=True)
+        raise SystemExit(1) from e
 
 
 @main.command()
-@click.option("--run-id", help="ETL run ID")
+@click.option("--run-id", help="ETL run ID (Airflow run ID string or numeric DB ID)")
 def validate(run_id: str | None) -> None:
     """Validate loaded listings."""
-    click.echo("Validating listings...")
+    if not run_id:
+        click.echo(
+            "Error: Please specify --run-id (Airflow run ID string or numeric DB ID)", err=True
+        )
+        raise SystemExit(1)
+
+    from korean_rental_etl.validation.thresholds import (
+        ValidationError,
+        get_audit_run_id_by_airflow_run_id,
+        validate_run,
+    )
+
+    try:
+        db_run_id = get_audit_run_id_by_airflow_run_id(run_id, task_id="transform")
+        click.echo(f"Validating run {run_id} (audit_id={db_run_id})...")
+        report = validate_run(db_run_id)
+        click.echo("  ✓ Validation passed!")
+        for check in report["checks"]:
+            status = "✓" if check["passed"] else "✗"
+            click.echo(f"    {status} {check['name']}: {check['message']}")
+    except ValidationError as e:
+        click.echo(f"  ✗ Validation failed: {e}", err=True)
+        raise SystemExit(1) from e
+    except Exception as e:
+        click.echo(f"  ✗ Error: {e}", err=True)
+        raise SystemExit(1) from e
 
 
-@main.command()
-def run_all() -> None:
+@main.command("run-all")
+@click.option("--dag-id", help="Airflow DAG ID")
+@click.option("--run-id", help="Airflow run ID")
+@click.pass_context
+def run_all(ctx: click.Context, dag_id: str | None, run_id: str | None) -> None:
     """Run full ETL pipeline (extract -> transform -> load -> validate)."""
-    click.echo("run-all command placeholder")
+    from datetime import UTC, datetime
+
+    if not run_id:
+        run_id = f"cli_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    if not dag_id:
+        dag_id = "cli_run_all"
+
+    try:
+        click.echo(">>> Step 1/4: Extracting...")
+        ctx.invoke(extract, extract_all=True, source=None, dag_id=dag_id, run_id=run_id)
+
+        click.echo(">>> Step 2/4: Transforming...")
+        ctx.invoke(
+            transform, transform_all=True, source=None, limit=500, dag_id=dag_id, run_id=run_id
+        )
+
+        click.echo(">>> Step 3/4: Loading...")
+        ctx.invoke(load, source=None, dag_id=dag_id, run_id=run_id)
+
+        click.echo(">>> Step 4/4: Validating...")
+        from korean_rental_etl.validation.thresholds import get_audit_run_id_by_airflow_run_id
+
+        db_run_id = get_audit_run_id_by_airflow_run_id(run_id, task_id="transform")
+        ctx.invoke(validate, run_id=str(db_run_id))
+        click.echo(">>> ETL Pipeline run-all completed successfully!")
+    except Exception as e:
+        click.echo(f"  ✗ run-all failed: {e}", err=True)
+        raise SystemExit(1) from e
+
+
+@main.group()
+def cleanup() -> None:
+    """Cleanup stale listings and old raw pages."""
+    pass
+
+
+@cleanup.command("mark-stale")
+@click.option("--days", type=int, default=14, help="Number of days")
+def mark_stale(days: int) -> None:
+    """Mark listings as inactive if not seen in N days."""
+    from korean_rental_etl.load.cleanup import mark_stale_listings_inactive
+
+    try:
+        count = mark_stale_listings_inactive(days=days)
+        click.echo(f"  ✓ Marked {count} listings as inactive")
+    except Exception as e:
+        click.echo(f"  ✗ Error: {e}", err=True)
+        raise SystemExit(1) from e
+
+
+@cleanup.command("purge-pages")
+@click.option("--days", type=int, default=90, help="Number of days")
+def purge_pages(days: int) -> None:
+    """Delete raw HTML pages older than N days."""
+    from korean_rental_etl.load.cleanup import purge_old_raw_pages
+
+    try:
+        count = purge_old_raw_pages(days=days)
+        click.echo(f"  ✓ Purged {count} raw pages")
+    except Exception as e:
+        click.echo(f"  ✗ Error: {e}", err=True)
+        raise SystemExit(1) from e
 
 
 if __name__ == "__main__":

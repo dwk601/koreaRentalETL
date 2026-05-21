@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 500
 
 
-def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int]:
+def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int, list[int]]:
     """Upsert a batch of staging rows into public.listings in a single transaction.
 
     Args:
@@ -21,13 +21,14 @@ def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int]:
         run_db_id: Audit run ID.
 
     Returns:
-        Tuple of (rows_upserted, rows_failed).
+        Tuple of (rows_upserted, rows_failed, list_of_staging_ids).
     """
     if not rows:
-        return 0, 0
+        return 0, 0, []
 
     upserted = 0
     failed = 0
+    loaded_staging_ids = []
 
     try:
         with get_cursor() as cur:
@@ -91,6 +92,8 @@ def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int]:
                     result = cur.fetchone()
                     if result:
                         upserted += 1
+                        if "id" in row:
+                            loaded_staging_ids.append(row["id"])
                 except Exception as e:
                     logger.warning("Failed to upsert row %s: %s", row.get("source_listing_id"), e)
                     failed += 1
@@ -98,21 +101,45 @@ def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int]:
         logger.error("Batch transaction failed: %s", e)
         raise
 
+    if run_db_id and (upserted > 0 or failed > 0):
+        try:
+            with get_cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE audit.etl_runs
+                    SET rows_loaded = rows_loaded + %s,
+                        rows_failed = rows_failed + %s
+                    WHERE id = %s
+                    """,
+                    (upserted, failed, run_db_id),
+                )
+        except Exception as e:
+            logger.warning("Failed to update audit.etl_runs for load counts: %s", e)
+
     logger.info("Upserted %d/%d listings", upserted, len(rows))
-    return upserted, failed
+    return upserted, failed, loaded_staging_ids
 
 
-def load_from_staging(source_id: int | None = None) -> tuple[int, int]:
+def load_from_staging(
+    source_id: int | None = None,
+    dag_id: str | None = None,
+    run_id: str | None = None,
+) -> tuple[int, int]:
     """Load all unparsed staging rows into public.listings.
 
     Args:
         source_id: Optional source filter.
+        dag_id: Airflow DAG ID.
+        run_id: Airflow run ID.
 
     Returns:
         Tuple of (rows_loaded, rows_failed).
     """
     run_db_id = start_run(
-        task_id="load", source_name="all" if source_id is None else str(source_id)
+        dag_id=dag_id,
+        task_id="load",
+        run_id=run_id,
+        source_name="all" if source_id is None else str(source_id),
     )
 
     with get_cursor() as cur:
@@ -139,9 +166,16 @@ def load_from_staging(source_id: int | None = None) -> tuple[int, int]:
     loaded = 0
     failed = 0
     try:
-        batch_loaded, batch_failed = upsert_batch(rows, run_db_id)
+        batch_loaded, batch_failed, staging_ids = upsert_batch(rows, run_db_id)
         loaded += batch_loaded
         failed += batch_failed
+
+        if staging_ids:
+            with get_cursor() as cur:
+                cur.execute(
+                    "UPDATE staging.listings_staging SET loaded_at = NOW() WHERE id = ANY(%s)",
+                    (staging_ids,),
+                )
 
         finish_run(run_db_id, status="success", rows_loaded=loaded, rows_failed=failed)
     except Exception as e:

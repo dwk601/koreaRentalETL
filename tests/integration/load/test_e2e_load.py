@@ -99,10 +99,14 @@ class TestE2ELoadIntegration:
             first_record = cur.fetchone()
             assert first_record is not None
 
+        # Manually reset loaded_at to NULL in staging to simulate a new staging entry or re-scrape
+        with test_conn.cursor() as cur:
+            cur.execute(
+                "UPDATE staging.listings_staging SET loaded_at = NULL WHERE source_listing_id = 'e2e_list_idempotent'"
+            )
+            test_conn.commit()
+
         # Load second time (simulating idempotency)
-        # Note: Since load_from_staging has a known bug (load_from_staging_no_loaded_at) where
-        # staging.loaded_at is not updated, calling load_from_staging() again will automatically
-        # re-fetch the same row and attempt to upsert it.
         loaded, failed = load_from_staging()
         assert (loaded, failed) == (1, 0)
 
@@ -131,6 +135,13 @@ class TestE2ELoadIntegration:
             cur.execute(
                 "UPDATE public.listings SET last_seen_at = %s WHERE source_listing_id = 'e2e_list_advance'",
                 (yesterday,),
+            )
+            test_conn.commit()
+
+        # Manually reset loaded_at to NULL in staging to simulate a new staging entry or re-scrape
+        with test_conn.cursor() as cur:
+            cur.execute(
+                "UPDATE staging.listings_staging SET loaded_at = NULL WHERE source_listing_id = 'e2e_list_advance'"
             )
             test_conn.commit()
 

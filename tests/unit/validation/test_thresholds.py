@@ -13,7 +13,10 @@ class TestThresholds:
     def test_parsed_rows_pass(self, mocker):
         """Should pass when current >= 50% of avg."""
         mock_cursor = mocker.MagicMock()
-        mock_cursor.fetchone.side_effect = [(100,), (200.0,)]  # current=100, avg=200
+        mock_cursor.fetchone.side_effect = [
+            {"rows_transformed": 100},
+            {"avg_val": 200.0},
+        ]  # current=100, avg=200
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)
@@ -24,7 +27,10 @@ class TestThresholds:
     def test_parsed_rows_fail(self, mocker):
         """Should fail when current < 50% of avg."""
         mock_cursor = mocker.MagicMock()
-        mock_cursor.fetchone.side_effect = [(50,), (200.0,)]  # current=50, avg=200, threshold=100
+        mock_cursor.fetchone.side_effect = [
+            {"rows_transformed": 50},
+            {"avg_val": 200.0},
+        ]  # current=50, avg=200, threshold=100
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)
@@ -36,7 +42,12 @@ class TestThresholds:
         """Should pass when null_rate <= 20%."""
         mock_cursor = mocker.MagicMock()
         # total=100, null_price=10, null_location=5, null_title=8 -> max=10%
-        mock_cursor.fetchone.return_value = (100, 10, 5, 8)
+        mock_cursor.fetchone.return_value = {
+            "total": 100,
+            "null_price": 10,
+            "null_location": 5,
+            "null_title": 8,
+        }
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)
@@ -48,7 +59,12 @@ class TestThresholds:
         """Should fail when null_rate > 20%."""
         mock_cursor = mocker.MagicMock()
         # total=100, null_price=25, null_location=5, null_title=8 -> max=25%
-        mock_cursor.fetchone.return_value = (100, 25, 5, 8)
+        mock_cursor.fetchone.return_value = {
+            "total": 100,
+            "null_price": 25,
+            "null_location": 5,
+            "null_title": 8,
+        }
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)
@@ -59,7 +75,7 @@ class TestThresholds:
     def test_fk_integrity_pass(self, mocker):
         """Should pass when no orphaned rows."""
         mock_cursor = mocker.MagicMock()
-        mock_cursor.fetchone.return_value = (0,)
+        mock_cursor.fetchone.return_value = {"count": 0}
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)
@@ -70,7 +86,7 @@ class TestThresholds:
     def test_fk_integrity_fail(self, mocker):
         """Should fail when orphaned rows exist."""
         mock_cursor = mocker.MagicMock()
-        mock_cursor.fetchone.return_value = (5,)
+        mock_cursor.fetchone.return_value = {"count": 5}
         mock_cursor.__enter__ = mocker.MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = mocker.MagicMock(return_value=None)
         mocker.patch("korean_rental_etl.validation.thresholds.get_cursor", return_value=mock_cursor)

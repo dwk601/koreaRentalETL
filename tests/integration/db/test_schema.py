@@ -123,3 +123,50 @@ class TestSchema:
             constraints = {row[0] for row in cur.fetchall()}
             # The unique constraint name may vary, just check one exists
             assert len(constraints) >= 1
+
+    def test_fts_index_handles_null_fields(self, test_conn: psycopg.Connection) -> None:
+        """FTS index operates correctly and searches succeed when some of the FTS fields are NULL."""
+        with test_conn.cursor() as cur:
+            # Insert a listing with some NULL FTS fields
+            cur.execute(
+                """
+                INSERT INTO public.listings (
+                    source_id, source_listing_id, url, title_ko, body_ko, address_raw
+                ) VALUES (
+                    1, 'fts-test-null-1', 'http://example.com/fts1', '강남역 오피스텔 월세', NULL, NULL
+                ) RETURNING id;
+                """
+            )
+            listing_id = cur.fetchone()[0]
+
+            # Insert another listing with a different NULL combination
+            cur.execute(
+                """
+                INSERT INTO public.listings (
+                    source_id, source_listing_id, url, title_ko, body_ko, address_raw
+                ) VALUES (
+                    1, 'fts-test-null-2', 'http://example.com/fts2', NULL, NULL, '서울시 서초구'
+                );
+                """
+            )
+            test_conn.commit()
+
+            # Verify both listings can be searched using the FTS concatenation expression
+            cur.execute(
+                """
+                SELECT id FROM public.listings
+                WHERE (COALESCE(title_ko,'') || ' ' || COALESCE(body_ko,'') || ' ' || COALESCE(address_raw,'')) LIKE '%오피스텔%';
+                """
+            )
+            results = cur.fetchall()
+            assert len(results) == 1
+            assert results[0][0] == listing_id
+
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM public.listings
+                WHERE (COALESCE(title_ko,'') || ' ' || COALESCE(body_ko,'') || ' ' || COALESCE(address_raw,'')) LIKE '%서초구%';
+                """
+            )
+            count = cur.fetchone()[0]
+            assert count == 1

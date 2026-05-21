@@ -158,6 +158,8 @@ def run(
     source_name: str | None = None,
     source_id: int | None = None,
     limit: int = 500,
+    dag_id: str | None = None,
+    run_id: str | None = None,
 ) -> tuple[int, int]:
     """Run the transform pipeline for one or all sources.
 
@@ -165,6 +167,8 @@ def run(
         source_name: Source name (e.g., 'svkoreans'). If None, processes all sources.
         source_id: Source ID. If None, looks up from source_name.
         limit: Max rows to process per source.
+        dag_id: Optional Airflow DAG ID.
+        run_id: Optional Airflow run ID string.
 
     Returns:
         Tuple of (rows_parsed, rows_failed).
@@ -181,7 +185,12 @@ def run(
             sources_to_process = [(row["name"], row["id"]) for row in cur.fetchall()]
 
     # Start audit run
-    run_id = start_run(task_id="transform", source_name=source_name or "all")
+    run_db_id = start_run(
+        dag_id=dag_id,
+        task_id="transform",
+        run_id=run_id,
+        source_name=source_name or "all",
+    )
 
     rows_parsed = 0
     rows_failed = 0
@@ -305,7 +314,7 @@ def run(
 
         # Finish audit run
         finish_run(
-            run_id,
+            run_db_id,
             status="success",
             rows_transformed=rows_parsed,
             rows_failed=rows_failed,
@@ -314,7 +323,7 @@ def run(
 
     except Exception as e:
         logger.error("Transform pipeline failed: %s", e)
-        finish_run(run_id, status="failed", error_message=str(e))
+        finish_run(run_db_id, status="failed", error_message=str(e))
         raise
 
     return rows_parsed, rows_failed

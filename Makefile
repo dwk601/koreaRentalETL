@@ -32,6 +32,25 @@ smoke: ## Run smoke tests (DAG imports + basic CLI)
 	uv run python -m korean_rental_etl.cli --version
 	@echo "Smoke test passed"
 
+verify-deploy: ## Verify production-ready containerized deployment
+	docker compose down -v
+	docker compose up -d --build
+	@echo "Waiting for services to become healthy..."
+	@for i in {1..30}; do \
+		if [ $$(docker compose ps --filter "status=running" | wc -l) -ge 5 ] && \
+		   [ $$(docker compose ps --filter "health=healthy" | wc -l) -ge 3 ]; then \
+			echo "Core services are healthy and running!"; \
+			break; \
+		fi; \
+		sleep 2; \
+	done
+	@echo "Verifying package installation in Airflow container..."
+	docker compose exec -T airflow-scheduler python -c "import korean_rental_etl; print('korean-rental-etl package imported successfully inside container!')"
+	@echo "Verifying CLI PATH availability..."
+	docker compose exec -T airflow-scheduler korean-rental-etl --version
+	@echo "Verifying DAGs import successfully without errors inside Airflow..."
+	docker compose exec -T airflow-scheduler python -c "from airflow.models import DagBag; db = DagBag(include_examples=False); assert len(db.import_errors) == 0, f'DAG Import errors: {db.import_errors}'; print('All DAGs loaded successfully without errors inside container!')"
+
 clean: ## Clean build artifacts
 	rm -rf build/ dist/ *.egg-info .pytest_cache .mypy_cache .ruff_cache htmlcov/ .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

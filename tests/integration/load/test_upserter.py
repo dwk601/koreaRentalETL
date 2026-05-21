@@ -80,7 +80,7 @@ class TestUpserterIntegration:
             self._build_staging_row(1, "list_3", 2000.0),
         ]
 
-        upserted, failed = upsert_batch(rows, run_db_id=123)
+        upserted, failed, _ = upsert_batch(rows, run_db_id=123)
         assert (upserted, failed) == (3, 0)
 
         with test_conn.cursor() as cur:
@@ -116,7 +116,7 @@ class TestUpserterIntegration:
         row2["rent_monthly_usd"] = 1400.0
         row2["title_ko"] = "수정된 제목"
 
-        upserted, failed = upsert_batch([row2], run_db_id=123)
+        upserted, failed, _ = upsert_batch([row2], run_db_id=123)
         assert (upserted, failed) == (1, 0)
 
         with test_conn.cursor() as cur:
@@ -131,7 +131,7 @@ class TestUpserterIntegration:
 
     def test_upsert_batch_returns_zero_for_empty_input(self, test_conn: psycopg.Connection):
         """upsert_batch with empty rows list returns immediately with (0, 0)."""
-        upserted, failed = upsert_batch([], run_db_id=123)
+        upserted, failed, _ = upsert_batch([], run_db_id=123)
         assert (upserted, failed) == (0, 0)
 
         with test_conn.cursor() as cur:
@@ -145,7 +145,7 @@ class TestUpserterIntegration:
         # Invalid row has a non-existent source_id (violating foreign key constraint)
         invalid_row = self._build_staging_row(99999, "list_invalid", 1500.0)
 
-        upserted, failed = upsert_batch([valid_row, invalid_row], run_db_id=123)
+        upserted, failed, _ = upsert_batch([valid_row, invalid_row], run_db_id=123)
         # It returns (1, 1) because the first insert execution succeeded before the error occurred.
         assert (upserted, failed) == (1, 1)
 
@@ -175,12 +175,11 @@ class TestUpserterIntegration:
             results = [r["source_listing_id"] for r in cur.fetchall()]
             assert results == ["staging_1", "staging_2"]
 
-        # TODO: The production load_from_staging does NOT update staging.listings_staging.loaded_at.
-        # This is a known bug (load_from_staging_no_loaded_at). We assert the current broken behavior here.
+        # Verify that staging.listings_staging.loaded_at is set.
         with test_conn.cursor() as cur:
-            cur.execute("SELECT loaded_at IS NULL as is_null FROM staging.listings_staging")
-            loaded_ats = [r["is_null"] for r in cur.fetchall()]
-            assert all(loaded_ats)  # Flagging the bug: loaded_at is still NULL!
+            cur.execute("SELECT loaded_at IS NOT NULL as is_loaded FROM staging.listings_staging")
+            loaded_ats = [r["is_loaded"] for r in cur.fetchall()]
+            assert all(loaded_ats)
 
     def test_load_from_staging_filters_by_source_id(self, test_conn: psycopg.Connection):
         """load_from_staging(source_id) only loads rows belonging to that source_id."""
@@ -229,3 +228,25 @@ class TestUpserterIntegration:
             assert run["status"] == "success"
             assert run["rows_loaded"] == 0
             assert run["rows_failed"] == 0
+
+    def test_upsert_batch_increments_audit_counts(self, test_conn: psycopg.Connection):
+        """upsert_batch incrementally updates the audit row's loaded and failed counts."""
+        from korean_rental_etl.load.audit import get_run, start_run
+
+        run_db_id = start_run(task_id="load", source_name="test_audit")
+
+        row1 = self._build_staging_row(1, "audit_inc_1", 1000.0)
+        row2 = self._build_staging_row(99999, "audit_inc_invalid", 1500.0)  # fails FK
+
+        # Initial status
+        run_before = get_run(run_db_id)
+        assert run_before["rows_loaded"] == 0
+        assert run_before["rows_failed"] == 0
+
+        # Run upsert
+        upsert_batch([row1, row2], run_db_id=run_db_id)
+
+        # Verify increment
+        run_after = get_run(run_db_id)
+        assert run_after["rows_loaded"] == 1
+        assert run_after["rows_failed"] == 1

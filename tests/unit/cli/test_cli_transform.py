@@ -21,7 +21,9 @@ class TestCliTransform:
 
             assert result.exit_code == 0
             assert "Transformed 3 listings" in result.output
-            mock_run.assert_called_once_with(source_name="svkoreans", limit=10)
+            mock_run.assert_called_once_with(
+                source_name="svkoreans", limit=10, dag_id=None, run_id=None
+            )
 
     def test_transform_all_sources(self):
         """Test transform --all option."""
@@ -35,7 +37,7 @@ class TestCliTransform:
             assert result.exit_code == 0
             assert "Transformed 15 listings" in result.output
             assert "failed 2" in result.output
-            mock_run.assert_called_once_with(source_name=None, limit=500)
+            mock_run.assert_called_once_with(source_name=None, limit=500, dag_id=None, run_id=None)
 
     def test_transform_neither_source_nor_all(self):
         """Test error when neither --source nor --all is provided."""
@@ -56,7 +58,9 @@ class TestCliTransform:
             result = runner.invoke(main, ["transform", "--source", "gtksa", "--limit", "100"])
 
             assert result.exit_code == 0
-            mock_run.assert_called_once_with(source_name="gtksa", limit=100)
+            mock_run.assert_called_once_with(
+                source_name="gtksa", limit=100, dag_id=None, run_id=None
+            )
 
     def test_transform_error_handling(self):
         """Test error handling in transform command."""

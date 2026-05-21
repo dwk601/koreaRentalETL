@@ -271,7 +271,7 @@ class BaseScraper(ABC):
             "location": extract_title_bracket(title),
         }
 
-    def extract(self) -> tuple[int, int]:
+    def extract(self, dag_id: str | None = None, run_id: str | None = None) -> tuple[int, int]:
         """Run full extraction for this source.
 
         Returns:
@@ -282,7 +282,12 @@ class BaseScraper(ABC):
         from korean_rental_etl.transform.dedup.redis_layer import mark as redis_mark
         from korean_rental_etl.transform.dedup.redis_layer import seen as redis_seen
 
-        run_db_id = start_run(task_id="extract", source_name=self.source_name)
+        run_db_id = start_run(
+            dag_id=dag_id,
+            task_id="extract",
+            run_id=run_id,
+            source_name=self.source_name,
+        )
         extracted = 0
         skipped = 0
 

@@ -6,6 +6,7 @@ Tasks: health_check -> extract -> transform -> load -> validate -> notify
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 
 from airflow import DAG
@@ -16,7 +17,7 @@ from airflow.operators.email import EmailOperator
 default_args = {
     "owner": "korean-rental-etl",
     "depends_on_past": False,
-    "email": ["admin@example.com"],
+    "email": [os.environ.get("SMTP_TO", "admin@example.com")],
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,
@@ -40,30 +41,31 @@ with DAG(
 
     extract = BashOperator(
         task_id="extract",
-        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli extract --all",
+        bash_command='korean-rental-etl extract --all --dag-id "{{ dag.dag_id }}" --run-id "{{ run_id }}"',
     )
 
     transform = BashOperator(
         task_id="transform",
-        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli transform --all",
+        bash_command='korean-rental-etl transform --all --dag-id "{{ dag.dag_id }}" --run-id "{{ run_id }}"',
     )
 
     load = BashOperator(
         task_id="load",
-        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli load",
+        bash_command='korean-rental-etl load --dag-id "{{ dag.dag_id }}" --run-id "{{ run_id }}"',
     )
 
     validate = BashOperator(
         task_id="validate",
-        bash_command="cd /opt/airflow && python -m korean_rental_etl.cli validate",
+        bash_command='korean-rental-etl validate --run-id "{{ run_id }}"',
     )
 
     notify = EmailOperator(
         task_id="notify",
-        to="admin@example.com",
+        to=os.environ.get("SMTP_TO", "admin@example.com"),
         subject="Korean Rental ETL - Run Completed",
         html_content="<p>ETL run completed successfully at {{ execution_date }}</p>",
     )
 
     # Task dependencies
     health_check >> extract >> transform >> load >> validate >> notify
+
