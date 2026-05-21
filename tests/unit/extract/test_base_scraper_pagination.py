@@ -1,5 +1,7 @@
 """Tests for BaseScraper pagination helpers."""
 
+import pytest
+
 from korean_rental_etl.extract.base_scraper import BaseScraper
 
 
@@ -81,8 +83,5 @@ class TestPaginatedListUrls:
                 return {"html": "", "status": 200, "url": url}
 
         scraper = NoListUrlScraper(source_id=1)
-        try:
+        with pytest.raises(ValueError, match="_list_url not set"):
             list(scraper._paginated_list_urls())
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "_list_url not set" in str(e)

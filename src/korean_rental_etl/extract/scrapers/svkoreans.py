@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
