@@ -1,0 +1,26 @@
+FROM apache/airflow:2.10.0-python3.11
+
+USER root
+
+# Install system build dependencies and libpq for Postgres integration
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+# Create a project directory for copying the source code
+WORKDIR /opt/airflow/project
+
+# Copy package dependency manifests and source files
+COPY --chown=airflow:root pyproject.toml uv.lock ./
+COPY --chown=airflow:root src/ ./src/
+
+# Install the package locally using pip to put the cli executable on PATH
+RUN pip install --no-cache-dir .
+
+# Revert working directory to default Airflow home
+WORKDIR /opt/airflow
