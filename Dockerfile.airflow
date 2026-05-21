@@ -16,7 +16,7 @@ USER airflow
 WORKDIR /opt/airflow/project
 
 # Copy package dependency manifests and source files
-COPY --chown=airflow:root pyproject.toml uv.lock ./
+COPY --chown=airflow:root pyproject.toml uv.lock README.md ./
 COPY --chown=airflow:root src/ ./src/
 
 # Install the package locally using pip to put the cli executable on PATH
