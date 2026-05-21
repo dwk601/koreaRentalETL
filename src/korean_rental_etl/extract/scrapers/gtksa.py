@@ -7,6 +7,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
+from korean_rental_etl.extract.date_utils import parse_korean_date
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -27,43 +28,69 @@ class GtksaScraper(BaseScraper):
     _list_url = "https://gtksa.net/bbs/board.php?bo_table=rent"
 
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
-        try:
-            response = self.fetch_page(self._list_url)
-            selector = response
-        except Exception:
-            logger.exception("Could not fetch list page, using fixture fallback")
-            fixture_path = self._fixture_path("list_page_1.html")
-            if not fixture_path.exists():
-                return
-            html = fixture_path.read_text()
-            selector = self.parse_html(html)
+        for page_url in self._paginated_list_urls():
+            try:
+                response = self.fetch_page(page_url)
+                selector = response
+            except Exception:
+                logger.exception("Could not fetch page %s, using fixture fallback", page_url)
+                # Only use fixture for page 1
+                if "page=1" not in page_url and "?page=" in page_url:
+                    break
+                fixture_path = self._fixture_path("list_page_1.html")
+                if not fixture_path.exists():
+                    break
+                html = fixture_path.read_text()
+                selector = self.parse_html(html)
 
-        for anchor in selector.css("div.bo_tit > a[href*='wr_id']"):
-            href = anchor.attrib.get("href", "")
-            if not href:
-                continue
-            title = anchor.get_all_text().strip()
-            if not title:
-                continue
+            page_has_stale = False
+            for row in selector.css("div.bo_tit"):
+                anchor = row.css("a[href*='wr_id']")
+                if not anchor:
+                    continue
+                anchor = anchor[0]
 
-            full_url = selector.urljoin(href) if hasattr(selector, "urljoin") else href
-            if not full_url.startswith("http"):
-                full_url = (
-                    f"https://gtksa.net{href}"
-                    if href.startswith("/")
-                    else f"https://gtksa.net/{href}"
-                )
+                href = anchor.attrib.get("href", "")
+                if not href:
+                    continue
+                title = anchor.get_all_text().strip()
+                if not title:
+                    continue
 
-            match = re.search(r"wr_id=(\d+)", full_url)
-            if not match:
-                continue
-            wr_id = match.group(1)
+                full_url = selector.urljoin(href) if hasattr(selector, "urljoin") else href
+                if not full_url.startswith("http"):
+                    full_url = (
+                        f"https://gtksa.net{href}"
+                        if href.startswith("/")
+                        else f"https://gtksa.net/{href}"
+                    )
 
-            yield self._build_listing(
-                url=full_url,
-                source_listing_id=wr_id,
-                title=title,
-            )
+                match = re.search(r"wr_id=(\d+)", full_url)
+                if not match:
+                    continue
+                wr_id = match.group(1)
+
+                # Extract post_date from the bo_dt span within the same row
+                post_date = None
+                date_spans = row.css("span.bo_dt")
+                if date_spans:
+                    date_text = date_spans[0].get_all_text().strip()
+                    post_date = parse_korean_date(date_text)
+
+                # Check if this row is stale
+                if post_date and not self._within_cutoff(post_date):
+                    page_has_stale = True
+
+                yield self._build_listing(
+                    url=full_url,
+                    source_listing_id=wr_id,
+                    title=title,
+                ) | {"post_date": post_date, "post_date_ambiguous": False}
+
+            # Stop pagination if we found a stale row
+            if page_has_stale:
+                logger.debug("[gtksa] Stopping pagination: found stale row")
+                break
 
     def fetch_detail(self, url: str) -> dict[str, object]:
         response = self.fetch_page(url)
