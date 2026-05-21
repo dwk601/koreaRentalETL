@@ -419,23 +419,144 @@ Note: The coverage gate requires 80% coverage on the `transform` module. Pre-exi
 
 ### Database Schema
 
-**`public` schema:**
-- `sources` — Registry of scraping sources (name, URL, fetcher type, schedule, active status)
-- `listings` — Final clean listings (title, body, price, location, contact, category, geo_point, dedup flags, timestamps)
+The database uses four schemas that mirror the ETL stages:
 
-**`raw` schema:**
-- `scraped_pages` — Raw HTML from sources (source_id, url, html_content, content_hash, fetched_at)
+```
+public  → catalog tables (sources, listings)
+raw     → scraped HTML before parsing (scraped_pages)
+staging → parsed but not-yet-loaded rows (listings_staging)
+audit   → run-level execution logs (etl_runs)
+```
 
-**`staging` schema:**
-- `listings_staging` — Parsed but not yet loaded listings (intermediate state with errors, dedup flags, parsed_at, loaded_at)
+**Entity-relationship diagram:**
 
-**`audit` schema:**
-- `etl_runs` — Audit trail of ETL executions (dag_id, task_id, run_id, source_name, status, row counts, timestamps)
+```mermaid
+erDiagram
+    sources {
+        SERIAL id PK
+        VARCHAR name UK "unique source key"
+        VARCHAR display_name
+        TEXT base_url
+        VARCHAR fetcher_type "StealthyFetcher|DynamicFetcher"
+        VARCHAR schedule_cron
+        BOOLEAN is_active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+    scraped_pages {
+        BIGSERIAL id PK
+        INTEGER source_id FK
+        TEXT url
+        TEXT html_content
+        VARCHAR content_hash "SHA-256, dedup key"
+        INTEGER http_status
+        TEXT list_page_location "e.g. [LA], [애틀랜타]"
+        TIMESTAMPTZ fetched_at
+    }
+    listings_staging {
+        BIGSERIAL id PK
+        INTEGER source_id FK
+        VARCHAR source_listing_id
+        TEXT url
+        TEXT title_ko
+        TEXT body_ko
+        NUMERIC rent_monthly_usd
+        NUMERIC deposit_usd
+        VARCHAR lease_type "monthly|jeonse|short_term|lease"
+        TIMESTAMPTZ posted_at_utc
+        VARCHAR city
+        TEXT address_raw
+        VARCHAR phone
+        VARCHAR kakao_id
+        VARCHAR category
+        GEOMETRY geo_point "PostGIS Point(4326)"
+        BOOLEAN is_duplicate
+        BIGINT duplicate_of "→ listings_staging.id"
+        BIGINT canonical_id "→ listings.id"
+        TIMESTAMPTZ parsed_at
+        TIMESTAMPTZ loaded_at "NULL until upsert"
+        JSONB errors
+    }
+    listings {
+        BIGSERIAL id PK
+        INTEGER source_id FK
+        VARCHAR source_listing_id
+        TEXT url
+        TEXT title_ko
+        TEXT body_ko
+        NUMERIC rent_monthly_usd
+        NUMERIC deposit_usd
+        VARCHAR lease_type
+        TIMESTAMPTZ posted_at_utc
+        TIMESTAMPTZ first_seen_at
+        TIMESTAMPTZ last_seen_at
+        VARCHAR city
+        TEXT address_raw
+        GEOMETRY geo_point
+        VARCHAR phone
+        VARCHAR category
+        BOOLEAN is_canonical
+        INTEGER duplicate_count
+        BOOLEAN is_active "false = stale"
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+    etl_runs {
+        BIGSERIAL id PK
+        VARCHAR dag_id "Airflow DAG"
+        VARCHAR task_id "extract|transform|load"
+        VARCHAR run_id "Airflow run_id"
+        VARCHAR source_name "→ sources.name (by value)"
+        VARCHAR status "running|success|failed"
+        INTEGER rows_extracted
+        INTEGER rows_transformed
+        INTEGER rows_loaded
+        INTEGER rows_failed
+        TEXT error_message
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at
+        NUMERIC duration_sec
+    }
+
+    sources        ||--o{ scraped_pages    : "scraped from"
+    sources        ||--o{ listings_staging : "parsed for"
+    sources        ||--o{ listings         : "published to"
+    scraped_pages  }o..o{ listings_staging : "parsed into (by url+hash)"
+    listings_staging }o..o| listings       : "upserted to (canonical_id)"
+```
+
+**Tables at a glance:**
+
+| Schema | Table | Role | Unique key |
+|--------|-------|------|------------|
+| `public` | `sources` | Source registry | `name` |
+| `raw` | `scraped_pages` | Raw HTML history | `(source_id, url, content_hash)` |
+| `staging` | `listings_staging` | Parsed rows pending load | `(source_id, source_listing_id)` |
+| `public` | `listings` | Canonical clean listings | `(source_id, source_listing_id)` |
+| `audit` | `etl_runs` | Per-task execution audit | `id` (looked up via `run_id`) |
+
+**Data flow through the tables:**
+
+1. **Extract** writes one row per fetched page into `raw.scraped_pages` (hashes prevent re-storing identical HTML).
+2. **Transform** reads unparsed rows from `raw.scraped_pages`, parses them, and writes to `staging.listings_staging` with `parsed_at` set and `loaded_at = NULL`.
+3. **Load** upserts `staging.listings_staging` rows into `public.listings` keyed on `(source_id, source_listing_id)`, then sets `loaded_at = NOW()` to mark idempotent completion.
+4. **Validate** reads `audit.etl_runs` and `staging.listings_staging` for the run, applies threshold checks (null rate, parsed-row count, FK integrity), and records pass/fail.
+5. **Cleanup** flips `listings.is_active = false` for rows whose `last_seen_at` is older than N days, and deletes `raw.scraped_pages` rows older than M days.
 
 **Key indexes:**
-- Trigram FTS on `listings(COALESCE(title_ko,'') || ' ' || COALESCE(body_ko,'') || ' ' || COALESCE(address_raw,''))` for Korean full-text search
-- GiST on `listings(geo_point)` for geographic queries
-- B-tree on `listings(source_id, is_active, posted_at_utc, last_seen_at)` for common filters
+
+| Index | Definition | Used for |
+|-------|------------|----------|
+| `idx_listings_korean_fts` | `GIN ((COALESCE(title_ko,'') \|\| ' ' \|\| COALESCE(body_ko,'') \|\| ' ' \|\| COALESCE(address_raw,'')) gin_trgm_ops)` | Korean trigram full-text search (NULL-safe via migration 002) |
+| `idx_listings_geo_point` | `GIST (geo_point)` | Spatial queries (within radius, bounding box) |
+| `idx_listings_source_id` / `_city` / `_category` / `_is_active` / `_posted_at` / `_last_seen` | B-tree on each | Common filter columns |
+| `idx_scraped_pages_source_url` | B-tree `(source_id, url)` | Lookup by source + URL |
+| `idx_staging_source_listing` | UNIQUE B-tree `(source_id, source_listing_id)` | Upsert lookup |
+| `idx_etl_runs_run_id` | B-tree `(run_id)` | Resolve Airflow `run_id` → numeric audit id |
+
+**PostgreSQL extensions:** `postgis` (for `GEOMETRY` and GiST), `pg_trgm` (for trigram FTS).
+
+The full schema definitions live in [`sql/migrations/001_initial_schema.sql`](sql/migrations/001_initial_schema.sql) and [`sql/migrations/002_fix_fts_index.sql`](sql/migrations/002_fix_fts_index.sql).
 
 ### Migrations
 
