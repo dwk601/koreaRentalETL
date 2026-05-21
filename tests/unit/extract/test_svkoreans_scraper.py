@@ -56,6 +56,20 @@ class TestSvkoreansScraper:
         ids = [listing["source_listing_id"] for listing in listings]
         assert len(ids) == len(set(ids))
 
+    def test_post_dates_parsed_from_list_etc(self, scraper: SvkoreansScraper) -> None:
+        """Regression: list_etc text like '등록일 05. 18' must parse to a real date.
+
+        Earlier `parse_korean_date` rejected the space after the period and
+        returned None, which silently disabled the cutoff filter and forced the
+        crawler to walk every page up to ``max_pages``.
+        """
+        listings = list(scraper.crawl_list_pages())
+        dated = [listing for listing in listings if listing.get("post_date") is not None]
+        assert dated, "Expected at least one listing with a parsed post_date"
+        # The fixture's MM. DD entries should now resolve to real dates.
+        # Time-only entries (e.g. '16:53') resolve to today.
+        assert all(listing["post_date"] is not None for listing in listings)
+
 
 class TestDetailPages:
     def test_detail_page_12345(self) -> None:

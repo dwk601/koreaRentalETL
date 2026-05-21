@@ -30,9 +30,11 @@ def parse_korean_date(s: str, today: date | None = None) -> date | None:
         today = date.today()
 
     # Try YYYY-MM-DD, YYYY.MM.DD, YYYY/MM/DD
+    # Allow optional whitespace around separators (e.g. "2026. 05. 20")
     for sep in ["-", ".", "/"]:
         match = re.match(
-            r"(\d{4})" + re.escape(sep) + r"(\d{1,2})" + re.escape(sep) + r"(\d{1,2})", s
+            r"(\d{4})\s*" + re.escape(sep) + r"\s*(\d{1,2})\s*" + re.escape(sep) + r"\s*(\d{1,2})",
+            s,
         )
         if match:
             try:
@@ -41,8 +43,10 @@ def parse_korean_date(s: str, today: date | None = None) -> date | None:
                 pass
 
     # Try MM-DD, MM/DD, MM.DD (infer year)
+    # Allow optional whitespace after the separator (e.g. "05. 20" — common on
+    # Korean community boards like svkoreans).
     for sep in ["-", ".", "/"]:
-        match = re.match(r"(\d{1,2})" + re.escape(sep) + r"(\d{1,2})(?:\s|$)", s)
+        match = re.match(r"(\d{1,2})\s*" + re.escape(sep) + r"\s*(\d{1,2})(?:\s|$)", s)
         if match:
             try:
                 month, day = int(match.group(1)), int(match.group(2))

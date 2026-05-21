@@ -80,6 +80,22 @@ class TestParseKoreanDate:
         assert parse_korean_date("  05-18  ", today=today) == date(2026, 5, 18)
         assert parse_korean_date("05-18 ", today=today) == date(2026, 5, 18)
 
+    def test_mm_dd_with_space_after_separator(self) -> None:
+        """svkoreans.com formats dates as '05. 20' with a space after the period."""
+        today = date(2026, 5, 21)
+        assert parse_korean_date("05. 20", today=today) == date(2026, 5, 20)
+        assert parse_korean_date("05. 18", today=today) == date(2026, 5, 18)
+        assert parse_korean_date("05 .18", today=today) == date(2026, 5, 18)
+        assert parse_korean_date("05 . 18", today=today) == date(2026, 5, 18)
+        # Hyphen and slash variants
+        assert parse_korean_date("05- 18", today=today) == date(2026, 5, 18)
+        assert parse_korean_date("05/ 18", today=today) == date(2026, 5, 18)
+
+    def test_yyyy_mm_dd_with_spaces_around_separator(self) -> None:
+        """Defensive: handle '2026. 05. 20' style if a source ever produces it."""
+        assert parse_korean_date("2026. 05. 20") == date(2026, 5, 20)
+        assert parse_korean_date("2026 . 05 . 20") == date(2026, 5, 20)
+
     def test_year_boundary_december_to_january(self) -> None:
         today = date(2026, 1, 5)
         # 12-30 is in the past (last year)

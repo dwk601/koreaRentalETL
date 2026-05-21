@@ -314,7 +314,9 @@ class BaseScraper(ABC):
         """Run full extraction for this source.
 
         Returns:
-            Tuple of (pages_extracted, pages_skipped)
+            Tuple of (pages_extracted, pages_skipped). The skipped count
+            includes both stale (outside cutoff) and already-seen (Redis cache)
+            URLs. A breakdown is emitted at INFO level for diagnostics.
         """
         from korean_rental_etl.extract.raw_writer import save
         from korean_rental_etl.load.audit import finish_run, start_run
@@ -328,7 +330,8 @@ class BaseScraper(ABC):
             source_name=self.source_name,
         )
         extracted = 0
-        skipped = 0
+        skipped_stale = 0
+        skipped_seen = 0
 
         try:
             for listing in self.crawl_list_pages():
@@ -337,13 +340,13 @@ class BaseScraper(ABC):
                 # Cutoff gate: skip if post_date is outside cutoff window
                 post_date = self._resolve_post_date(listing)
                 if not self._within_cutoff(post_date):
-                    skipped += 1
+                    skipped_stale += 1
                     logger.debug("Skipping stale URL: %s (post_date=%s)", url, post_date)
                     continue
 
                 # Detail-page gating: skip if already seen in Redis
                 if redis_seen(self.source_name, url):
-                    skipped += 1
+                    skipped_seen += 1
                     logger.debug("Skipping already-seen URL: %s", url)
                     continue
 
@@ -365,6 +368,15 @@ class BaseScraper(ABC):
                 # Mark as seen regardless (even if duplicate, to avoid re-fetch)
                 redis_mark(self.source_name, url)
 
+            skipped = skipped_stale + skipped_seen
+            logger.info(
+                "[%s] extract summary: extracted=%d skipped=%d (stale=%d already_seen=%d)",
+                self.source_name,
+                extracted,
+                skipped,
+                skipped_stale,
+                skipped_seen,
+            )
             finish_run(run_db_id, status="success", rows_extracted=extracted)
         except Exception as e:
             finish_run(run_db_id, status="failed", rows_extracted=extracted, error_message=str(e))
