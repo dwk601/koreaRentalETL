@@ -59,6 +59,7 @@ services:
       context: .
       dockerfile: Dockerfile.airflow
     container_name: korean_rental_airflow_init
+    restart: "no"
     depends_on:
       airflow_postgres:
         condition: service_healthy
