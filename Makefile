@@ -1,4 +1,4 @@
-.PHONY: help lint typecheck test test-integration ci smoke clean install dev
+.PHONY: help lint typecheck test test-integration ci smoke clean install dev backup restore
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -54,3 +54,16 @@ verify-deploy: ## Verify production-ready containerized deployment
 clean: ## Clean build artifacts
 	rm -rf build/ dist/ *.egg-info .pytest_cache .mypy_cache .ruff_cache htmlcov/ .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+backup: ## Generate a timestamped Postgres custom-format backup (.dump)
+	@mkdir -p backups
+	docker compose exec -T postgres sh -c 'PGPASSWORD=$$POSTGRES_PASSWORD pg_dump -U $$POSTGRES_USER -d $$POSTGRES_DB -Fc' > backups/korean_rental_$$(date +%Y-%m-%dT%H-%M-%S).dump
+	@echo "Backup completed successfully!"
+
+restore: ## Restore the Postgres database from a backup file (e.g. make restore BACKUP_FILE=backups/file.dump)
+	@if [ -z "$(BACKUP_FILE)" ]; then \
+		echo "ERROR: BACKUP_FILE is required. Example: make restore BACKUP_FILE=backups/korean_rental_xyz.dump"; \
+		exit 1; \
+	fi
+	docker compose exec -T postgres sh -c 'PGPASSWORD=$$POSTGRES_PASSWORD pg_restore -U $$POSTGRES_USER -d $$POSTGRES_DB --clean --if-exists -Fc' < $(BACKUP_FILE)
+	@echo "Restore completed successfully!"

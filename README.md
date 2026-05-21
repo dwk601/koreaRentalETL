@@ -184,6 +184,7 @@ When deploying to a production host managed by **Coolify**:
    - `SMTP_PASSWORD`: A fresh API key generated from the **Resend** SMTP dashboard (see network isolation and SMTP setup below). Note: Any previously exposed SMTP/Resend API keys (e.g. leaked in chat) are compromised and MUST be rotated.
 2. **Encrypted Storage**: Coolify automatically encrypts environment variables stored in its database.
 3. **Fail-Fast behavior**: If any of the required passwords above are missing or empty, database configuration will raise a `RuntimeError` immediately upon start.
+4. **Postgres Backups & Disaster Recovery**: Production database backups are managed automatically by Coolify. See the comprehensive [backups.md](docs/backups.md) for automated scheduling, offsite copy setups, manual recovery tools, and restore drill instructions.
 
 ### Verifying the Deployment
 

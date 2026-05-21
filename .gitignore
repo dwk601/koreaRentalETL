@@ -26,6 +26,9 @@ ENV/
 .env.local
 .env.production
 
+# Backups
+backups/
+
 # Logs
 logs/
 *.log
