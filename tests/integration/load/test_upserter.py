@@ -1,21 +1,4 @@
-"""Integration tests for upserter module.
-
-Discovered Bugs & Design Notes for Follow-Up:
-1. `load_from_staging_no_loaded_at`:
-   load_from_staging() fetches rows WHERE loaded_at IS NULL but never sets loaded_at
-   after a successful upsert. As a result, the same rows are reloaded on every run.
-   In these tests, we assert staging.loaded_at is NOT set, flagging this bug.
-
-2. `upsert_batch_unused_run_id`:
-   upsert_batch(rows, run_db_id) takes run_db_id as an argument, but the parameter
-   is completely unused in the function body.
-
-3. `cleanup_interval_parameterization`:
-   cleanup.py used 'INTERVAL %s days' inside SQL query string literals. Psycopg
-   does not parameterize variables inside string literals, which leads to SQL syntax
-   errors. This was successfully confirmed during Task 4 and resolved inline using
-   the parameter-safe pattern: NOW() - (%s || ' days')::interval.
-"""
+"""Integration tests for upserter module."""
 
 import psycopg
 import pytest
@@ -140,23 +123,29 @@ class TestUpserterIntegration:
             assert count == 0
 
     def test_upsert_batch_handles_per_row_failures(self, test_conn: psycopg.Connection):
-        """upsert_batch counts row-level failures, but database transaction rolls back on SQL error."""
+        """upsert_batch successfully commits successful rows in a batch even when individual rows fail."""
+        from korean_rental_etl.load.audit import get_run, start_run
+
+        run_db_id = start_run(task_id="load", source_name="test_audit")
+
         valid_row = self._build_staging_row(1, "list_valid", 1200.0)
         # Invalid row has a non-existent source_id (violating foreign key constraint)
         invalid_row = self._build_staging_row(99999, "list_invalid", 1500.0)
 
-        upserted, failed, _ = upsert_batch([valid_row, invalid_row], run_db_id=123)
-        # It returns (1, 1) because the first insert execution succeeded before the error occurred.
+        upserted, failed, _ = upsert_batch([valid_row, invalid_row], run_db_id=run_db_id)
+        # It returns (1, 1) because the first insert execution succeeded and the second failed.
         assert (upserted, failed) == (1, 1)
 
         with test_conn.cursor() as cur:
             cur.execute("SELECT source_listing_id FROM public.listings")
             records = [r["source_listing_id"] for r in cur.fetchall()]
-            # Note: Because the second insert threw a ForeignKeyViolation, the transaction
-            # was aborted by PostgreSQL. Even though upsert_batch caught the exception and
-            # returned (1, 1), the connection context manager rolled back the aborted transaction,
-            # so no records were actually committed.
-            assert len(records) == 0
+            # With per-row subtransactions (SAVEPOINTs), the successful row is preserved.
+            assert records == ["list_valid"]
+
+        # Verify audit increment
+        run_after = get_run(run_db_id)
+        assert run_after["rows_loaded"] == 1
+        assert run_after["rows_failed"] == 1
 
     def test_load_from_staging_loads_unloaded_rows(self, test_conn: psycopg.Connection):
         """load_from_staging loads unloaded rows from staging.listings_staging into public.listings."""
