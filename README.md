@@ -325,6 +325,8 @@ uv sync --extra dev --extra test
 | `make ci` | Run full CI pipeline (lint + typecheck + test) |
 | `make smoke` | Run smoke tests (DAG imports + CLI version) |
 | `make verify-deploy` | Verify production-ready containerized deployment |
+| `make backup` | Create a timestamped Postgres custom-format dump under `backups/` |
+| `make restore` | Restore from a backup: `make restore BACKUP_FILE=backups/<file>.dump` |
 | `make clean` | Clean build artifacts and caches |
 
 ### Project Structure

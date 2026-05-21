@@ -21,6 +21,10 @@ def test_get_db_config_raises_with_empty_password(monkeypatch):
 
 def test_get_db_config_succeeds_with_password(monkeypatch):
     """get_db_config returns config dict when password is set."""
+    # Isolate all POSTGRES_* env vars so the test does not pick up shell/env defaults
+    # (e.g. POSTGRES_HOST=postgres from a developer's docker-compose .env).
+    for var in ("POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER"):
+        monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("POSTGRES_PASSWORD", "secret_pass")
     cfg = get_db_config()
     assert cfg["password"] == "secret_pass"

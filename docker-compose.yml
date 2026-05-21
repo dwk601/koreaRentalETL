@@ -97,7 +97,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.airflow.rule=Host($${AIRFLOW_HOST})"
+      - "traefik.http.routers.airflow.rule=Host(`${AIRFLOW_HOST}`)"
       - "traefik.http.routers.airflow.entrypoints=https"
       - "traefik.http.routers.airflow.tls.certresolver=letsencrypt"
       - "traefik.http.services.airflow.loadbalancer.server.port=8080"
@@ -109,7 +109,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     command: airflow webserver
 
   airflow-scheduler:
@@ -136,7 +136,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 120s
     command: airflow scheduler
 
 volumes:
