@@ -33,8 +33,8 @@ smoke: ## Run smoke tests (DAG imports + basic CLI)
 	@echo "Smoke test passed"
 
 verify-deploy: ## Verify production-ready containerized deployment
-	docker compose down -v
-	docker compose up -d --build
+	docker compose --profile dev down -v
+	docker compose --profile dev up -d --build
 	@echo "Waiting for services to become healthy..."
 	@for i in {1..30}; do \
 		if [ $$(docker compose ps --filter "status=running" | wc -l) -ge 5 ] && \

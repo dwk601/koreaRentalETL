@@ -1,6 +1,7 @@
 """Unit tests for connection module."""
 
 import pytest
+
 from korean_rental_etl.db.connection import get_db_config
 
 

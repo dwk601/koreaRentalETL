@@ -119,9 +119,10 @@ Copy `.env.example` to `.env` and edit the following keys:
 
 | Key | Required | Default | Description |
 |-----|----------|---------|-------------|
-| `POSTGRES_PASSWORD` | Yes | `change_me_in_production` | PostgreSQL app DB password |
-| `AIRFLOW_DB_PASSWORD` | Yes | `change_me_in_production` | Airflow metadata DB password |
-| `AIRFLOW_ADMIN_PASSWORD` | Yes | `change_me_in_production` | Airflow web UI admin password |
+| `POSTGRES_PASSWORD` | Yes | *None* | PostgreSQL app DB password (fail-fast check) |
+| `AIRFLOW_DB_PASSWORD` | Yes | *None* | Airflow metadata DB password (fail-fast check) |
+| `AIRFLOW_ADMIN_PASSWORD` | Yes | *None* | Airflow web UI admin password (fail-fast check) |
+| `AIRFLOW_HOST` | Yes | `localhost` | The hostname routing the Airflow WebUI (Coolify/Traefik) |
 | `POSTGRES_USER` | No | `etl_user` | PostgreSQL app DB user |
 | `POSTGRES_DB` | No | `korean_rental` | PostgreSQL app DB name |
 | `POSTGRES_PORT` | No | `5432` | PostgreSQL app DB port |
@@ -132,21 +133,29 @@ Copy `.env.example` to `.env` and edit the following keys:
 | `CONCURRENT_REQUESTS` | No | `2` | Scraper concurrent request limit |
 | `MAX_RETRIES` | No | `3` | Scraper retry count |
 | `EXTRACT_CUTOFF_DAYS` | No | `30` | Days of history to extract; initial runs backfill this window, steady-state runs only pull new listings |
-| `SMTP_HOST` | No | `localhost` | SMTP server for Airflow alerts |
-| `SMTP_PORT` | No | `1025` | SMTP port |
-| `SMTP_TO` | No | `admin@example.com` | Email recipient for Airflow alerts |
-| `LOG_LEVEL` | No | `INFO` | Application log level |
+| `AIRFLOW__SMTP__SMTP_HOST` | Yes | `smtp.resend.com` | Production SMTP relay host |
+| `AIRFLOW__SMTP__SMTP_PORT` | Yes | `587` | Production SMTP port |
+| `AIRFLOW__SMTP__SMTP_STARTTLS` | Yes | `True` | SMTP StartTLS flag |
+| `AIRFLOW__SMTP__SMTP_SSL` | Yes | `False` | SMTP SSL flag |
+| `AIRFLOW__SMTP__SMTP_USER` | Yes | `resend` | SMTP username |
+| `AIRFLOW__SMTP__SMTP_PASSWORD` | Yes | *None* | SMTP password / Resend API key |
+| `AIRFLOW__SMTP__SMTP_MAIL_FROM` | Yes | *None* | SMTP sender email |
+| `SMTP_TO` | Yes | `admin@example.com` | Email recipient for Airflow alerts |
 
 ### Service Ports
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Airflow WebUI | 8080 | DAG monitoring and triggering |
-| PostgreSQL (app) | 5432 | Korean rental listings database |
-| PostgreSQL (Airflow) | 5433 | Airflow metadata database |
-| Redis | 6379 | Deduplication cache |
-| MailHog SMTP | 1025 | Email relay (dev only) |
-| MailHog WebUI | 8025 | Email inbox viewer (dev only) |
+For production hardening, all services are network isolated within the Docker bridge network. No ports are exposed publicly to the host interface.
+
+For local development, `docker-compose.override.yml` is used to expose ports securely and bind them exclusively to `127.0.0.1`:
+
+| Service | Port | Binding | Purpose |
+|---------|------|---------|---------|
+| Airflow WebUI | 8080 | `127.0.0.1:8080` | DAG monitoring and triggering |
+| PostgreSQL (app) | 5432 | `127.0.0.1:5432` | Korean rental listings database |
+| PostgreSQL (Airflow) | 5433 | `127.0.0.1:5433` | Airflow metadata database |
+| Redis | 6379 | `127.0.0.1:6379` | Deduplication cache |
+| MailHog SMTP | 1025 | `127.0.0.1:1025` | Email relay (dev only, under `dev` profile) |
+| MailHog WebUI | 8025 | `127.0.0.1:8025` | Email inbox viewer (dev only, under `dev` profile) |
 
 ### Deploying
 
@@ -278,9 +287,15 @@ docker compose exec redis redis-cli ping
 docker compose logs redis
 ```
 
-### Before Exposing Publicly
+### Production Hardening Posture
 
-> ⚠ **Before exposing publicly**: This deployment uses default passwords (`change_me_in_production`), binds all services to all interfaces (0.0.0.0), has no TLS on the Airflow WebUI, and uses MailHog (a dev-only mail sink) for email alerts. Before deploying to a public-facing server, change all passwords in `.env`, restrict port bindings to `127.0.0.1` or a private network, front Airflow with a reverse proxy (nginx/Caddy) with TLS, and configure a real SMTP relay (AWS SES, SendGrid, etc.) for production email alerts. See your cloud provider's documentation for hardening guidance.
+This pipeline is fully hardened for production environments:
+
+- **Network Isolation**: By default, `docker-compose.yml` does not expose any ports to the host interface. All inter-service communication happens securely inside the private Docker network.
+- **Local Dev Binding**: Local development uses `docker-compose.override.yml` to safely bind ports to `127.0.0.1`.
+- **Secrets Validation**: The database and application will crash immediately on startup if key secret variables (like `POSTGRES_PASSWORD`, `AIRFLOW_DB_PASSWORD`, `AIRFLOW_ADMIN_PASSWORD`) are unset or empty.
+- **Coolify Integration**: Traefik labels are preconfigured for the `airflow-webserver` to allow Coolify to automatically provision Let's Encrypt TLS certificates and manage secure routing via the domain specified in `AIRFLOW_HOST`.
+- **Resend SMTP**: Production notification utilizes Resend SMTP over TLS/StartTLS, ensuring robust delivery of success/failure alerts.
 
 ## Developer's Guide
 
