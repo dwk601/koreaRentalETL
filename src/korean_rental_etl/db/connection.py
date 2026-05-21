@@ -17,14 +17,25 @@ if TYPE_CHECKING:
 _pool: ConnectionPool | None = None
 
 
+def _require_env(name: str) -> str:
+    val = os.environ.get(name)
+    if not val:
+        raise RuntimeError(f"{name} is not set; configure it in Coolify or your local .env")
+    return val
+
+
 def get_db_config() -> dict[str, str | int]:
-    """Get database configuration from environment variables."""
+    """Get database configuration from environment variables.
+
+    Raises:
+        RuntimeError: If required POSTGRES_PASSWORD is not set or is empty.
+    """
     return {
         "host": os.environ.get("POSTGRES_HOST", "localhost"),
         "port": int(os.environ.get("POSTGRES_PORT", "5432")),
         "dbname": os.environ.get("POSTGRES_DB", "korean_rental"),
         "user": os.environ.get("POSTGRES_USER", "etl_user"),
-        "password": os.environ.get("POSTGRES_PASSWORD", "change_me_in_production"),
+        "password": _require_env("POSTGRES_PASSWORD"),
     }
 
 

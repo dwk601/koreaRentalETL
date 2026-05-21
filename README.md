@@ -163,6 +163,19 @@ docker compose ps --filter "health=healthy"
 
 The `airflow-init` service runs migrations and creates the admin user automatically. Wait ~30 seconds for all services to become healthy.
 
+### Coolify Deployment
+
+When deploying to a production host managed by **Coolify**:
+
+1. **Environment Variables**: Configure the following environment variables in the Coolify project/application Environment variables tab:
+   - `POSTGRES_PASSWORD`: A unique cryptographically strong password. Do not commit this.
+   - `AIRFLOW_DB_PASSWORD`: A unique strong password for the Airflow metadata database.
+   - `AIRFLOW_ADMIN_PASSWORD`: A strong password to log into the Airflow WebUI.
+   - `AIRFLOW_HOST`: The domain you plan to route the Airflow WebUI through (e.g. `airflow.example.com`).
+   - `SMTP_PASSWORD`: A fresh API key generated from the **Resend** SMTP dashboard (see network isolation and SMTP setup below). Note: Any previously exposed SMTP/Resend API keys (e.g. leaked in chat) are compromised and MUST be rotated.
+2. **Encrypted Storage**: Coolify automatically encrypts environment variables stored in its database.
+3. **Fail-Fast behavior**: If any of the required passwords above are missing or empty, database configuration will raise a `RuntimeError` immediately upon start.
+
 ### Verifying the Deployment
 
 ```bash
