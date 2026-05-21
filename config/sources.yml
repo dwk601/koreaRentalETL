@@ -9,7 +9,6 @@ sources:
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "SV Korean community rental board"
 
@@ -20,7 +19,6 @@ sources:
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "GTKSA rental board"
 
@@ -31,7 +29,6 @@ sources:
     schedule: "0 */4 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "MissyUSA town9 rental section"
 
@@ -42,7 +39,6 @@ sources:
     schedule: "0 */8 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "Korea Daily K-Town rental listings"
 
@@ -53,7 +49,6 @@ sources:
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "Radio Korea real estate board"
 
@@ -64,6 +59,5 @@ sources:
     schedule: null
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: disabled
     description: "Hanin Town (disabled placeholder)"

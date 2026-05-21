@@ -41,7 +41,6 @@ class TestSourceConfig:
         assert cfg.fetcher == "Fetcher"
         assert cfg.download_delay_sec == 2.0
         assert cfg.concurrent_requests == 1
-        assert cfg.robots_txt_obey is True
         assert cfg.status == "active"
 
 
@@ -118,7 +117,6 @@ sources:
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1
-    robots_txt_obey: true
     status: active
     description: "SV Korean community"
 """

@@ -19,7 +19,6 @@ class SourceConfig(BaseModel):
     schedule: str | None = None
     download_delay_sec: float = Field(default=2.0, ge=0)
     concurrent_requests: int = Field(default=1, ge=1)
-    robots_txt_obey: bool = True
     status: Literal["active", "disabled"] = "active"
     description: str = ""
 
