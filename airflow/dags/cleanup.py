@@ -6,6 +6,7 @@ Tasks: mark_stale_listings_inactive, purge_old_raw_pages
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 
 from airflow import DAG
@@ -15,7 +16,7 @@ from airflow.operators.bash import BashOperator
 default_args = {
     "owner": "korean-rental-etl",
     "depends_on_past": False,
-    "email": ["admin@example.com"],
+    "email": [os.environ.get("SMTP_TO", "admin@example.com")],
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 2,
@@ -33,20 +34,13 @@ with DAG(
 ) as dag:
     mark_stale = BashOperator(
         task_id="mark_stale_listings_inactive",
-        bash_command=(
-            "cd /opt/airflow && python -c "
-            "'from korean_rental_etl.load.cleanup import mark_stale_listings_inactive; "
-            "mark_stale_listings_inactive()'"
-        ),
+        bash_command="korean-rental-etl cleanup mark-stale --days 14",
     )
 
     purge_raw = BashOperator(
         task_id="purge_old_raw_pages",
-        bash_command=(
-            "cd /opt/airflow && python -c "
-            "'from korean_rental_etl.load.cleanup import purge_old_raw_pages; "
-            "purge_old_raw_pages()'"
-        ),
+        bash_command="korean-rental-etl cleanup purge-pages --days 90",
     )
 
     mark_stale >> purge_raw
+
