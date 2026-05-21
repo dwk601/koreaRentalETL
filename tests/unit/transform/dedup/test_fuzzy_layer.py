@@ -162,3 +162,41 @@ class TestFuzzyLayer:
         result = find_duplicates(listings)
         canonical = [r for r in result if not r["is_duplicate"]][0]
         assert canonical["id"] == 2
+
+
+class TestMultiCityRegression:
+    """Regression test for the cross-city index leak bug.
+
+    Before the fix, ``processed`` was a single set shared across all cities
+    that tracked indices restarting from 0 per-city. Once city A processed
+    indices 0..N, city B's listings at the same indices were silently
+    skipped and dropped from the output, so most input was lost on a
+    real-world batch.
+    """
+
+    def test_listings_in_multiple_cities_all_appear_in_output(self):
+        from datetime import UTC, datetime
+        from korean_rental_etl.transform.dedup.fuzzy_layer import find_duplicates
+
+        now = datetime.now(UTC).isoformat()
+        listings = []
+        # 3 cities, 5 distinct listings each, all unique (no duplicates).
+        for city_idx, city in enumerate(["Mountain View", "San Jose", "Palo Alto"]):
+            for n in range(5):
+                listings.append(
+                    {
+                        "id": city_idx * 10 + n,
+                        "title_ko": f"{city} unique listing {n}",
+                        "rent_monthly_usd": 1000 + n,
+                        "city": city,
+                        "posted_at_utc": now,
+                    }
+                )
+
+        result = find_duplicates(listings)
+
+        # Every input listing must appear exactly once in output.
+        assert len(result) == len(listings)
+        in_ids = {id(r) for r in listings}
+        out_ids = {id(r) for r in result}
+        assert in_ids == out_ids

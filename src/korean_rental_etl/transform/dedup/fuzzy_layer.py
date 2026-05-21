@@ -33,9 +33,15 @@ def find_duplicates(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_city.setdefault(city, []).append(listing)
 
     results: list[dict[str, Any]] = []
-    processed = set()
 
     for _city, city_listings in by_city.items():
+        # Indices restart per city, so the "already processed" set MUST also
+        # restart per city. Sharing one set across cities (the previous bug)
+        # silently dropped any listing whose city-local index collided with
+        # an already-processed index from an earlier city, which left only
+        # a tiny fraction of input in the output.
+        processed: set[int] = set()
+
         if len(city_listings) < 2:
             for listing in city_listings:
                 listing["is_duplicate"] = False
