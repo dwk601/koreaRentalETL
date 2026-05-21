@@ -21,16 +21,23 @@ class GtksaScraper(BaseScraper):
     The board renders each row as ``div.bo_tit > a[href*='wr_id']``. The
     anchor's ``href`` is already absolute on the live site, so we still call
     ``Selector.urljoin`` defensively for fixture content.
+
+    gtksa.net's TLS certificate is currently expired on the server side, so
+    every fetch is sent with ``verify=False`` (curl_cffi). This is a public
+    listings board, so the privacy/security tradeoff is acceptable; if the
+    site fixes their cert this flag becomes a no-op.
     """
 
     source_name = "gtksa"
     fetcher_type = "Fetcher"
     _list_url = "https://gtksa.net/bbs/board.php?bo_table=rent"
+    # Forwarded to scrapling's Fetcher -> curl_cffi session.request.
+    _fetch_kwargs: dict[str, Any] = {"verify": False}
 
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         for page_url in self._paginated_list_urls():
             try:
-                response = self.fetch_page(page_url)
+                response = self.fetch_page(page_url, **self._fetch_kwargs)
                 selector = response
             except Exception:
                 logger.exception("Could not fetch page %s, using fixture fallback", page_url)
@@ -93,7 +100,7 @@ class GtksaScraper(BaseScraper):
                 break
 
     def fetch_detail(self, url: str) -> dict[str, object]:
-        response = self.fetch_page(url)
+        response = self.fetch_page(url, **self._fetch_kwargs)
         return {
             "html": str(response.html_content),
             "status": getattr(response, "status", None) or getattr(response, "status_code", 200),

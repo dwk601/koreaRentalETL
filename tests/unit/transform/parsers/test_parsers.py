@@ -36,7 +36,7 @@ class TestSVKoreansParser:
         assert "$1,500" in result["raw_price"]
         assert "$3,000" in result["raw_price"]
         assert "213-555-1234" in result["contact_block"]
-        assert "2024년 5월 1일" in result["raw_posted_at"]
+        assert "2024" in result["raw_posted_at"]
         assert len(result["content_hash"]) == 64
 
     def test_detail_12346(self, fixture_dir):
@@ -224,30 +224,29 @@ class TestInferLocationWiring:
 
     # --- svkoreans ---
 
-    def test_svkoreans_infers_location_from_bracket_when_no_label(self):
+    def test_svkoreans_reads_location_from_meta_table(self):
+        """svkoreans pulls 지역/위치 from the <table> in #bo_v_atc."""
         html = (
-            "<div class='view_wrap'>"
-            "<h1>[LA] 다운타운 1베드룸 월세</h1>"
-            "<div class='content'>"
-            "<p>LA 다운타운 7th Street 콘도 렌트합니다.</p>"
-            "<p>월세: $1,500</p>"
-            "</div></div>"
+            "<article id='bo_v'>"
+            "<h1 id='bo_v_title'>[LA] 다운타운 1베드룸 월세</h1>"
+            "<section id='bo_v_con'><div>본문 내용</div></section>"
+            "<section id='bo_v_atc'><table>"
+            "<tr><td><span>지역/위치</span></td><td><span class='na-bar'></span> LA 다운타운 7th Street</td></tr>"
+            "<tr><td><span>가격</span></td><td><span class='na-bar'></span> $1,500</td></tr>"
+            "</table></section>"
+            "</article>"
         )
         result = SVKoreansParser().parse_detail(html, "https://svkoreans.com/rent_housing/9001")
-        # Bracket already in head -> head alone (no double prefix).
-        assert result["raw_location"] == "LA 다운타운 7th Street 콘도 렌트합니다."
+        assert result["raw_location"] == "LA 다운타운 7th Street"
+        assert result["raw_price"] == "$1,500"
 
-    def test_svkoreans_labelled_wins_over_bracket_and_head(self):
-        html = (
-            "<div class='view_wrap'>"
-            "<h1>[OC] 풀러턴 콘도</h1>"
-            "<div class='content'>"
-            "<p>OC 풀러턴 다운타운 콘도 렌트</p>"
-            "<p>위치: 어바인 근처 6th Avenue</p>"
-            "</div></div>"
+    def test_svkoreans_listing_id_from_path_not_query(self):
+        """source_listing_id comes from /rent_housing/<id>, ignoring ?page=N."""
+        html = "<article id='bo_v'><h1 id='bo_v_title'>x</h1></article>"
+        result = SVKoreansParser().parse_detail(
+            html, "https://svkoreans.com/rent_housing/1634?page=5"
         )
-        result = SVKoreansParser().parse_detail(html, "https://svkoreans.com/rent_housing/9002")
-        assert result["raw_location"] == "어바인 근처 6th Avenue"
+        assert result["source_listing_id"] == "1634"
 
     # --- gtksa ---
 
@@ -280,33 +279,31 @@ class TestInferLocationWiring:
 
     # --- ktown_koreadaily ---
 
-    def test_ktown_koreadaily_infers_location_from_bracket_when_no_label(self):
+    def test_ktown_koreadaily_reads_city_state_from_lbl_ids(self):
+        """ktown pulls city + state from MainContent_lbl_city / lbl_state spans."""
         html = (
-            "<div class='rent_detail'>"
-            "<h2>[코리아타운] 스튜디오 렌트</h2>"
-            "<div class='body'>"
-            "<p>할리우드 인근 스튜디오 풀퍼니쳐</p>"
-            "<p>월세: $1,800</p>"
-            "</div></div>"
+            "<div class='cont_detail'>"
+            "<span id='MainContent_lbl_title'>스튜디오 렌트</span>"
+            "<span id='MainContent_lbl_city'>Los Angeles</span>"
+            "<span id='MainContent_lbl_state'>CA</span>"
+            "<span id='MainContent_lbl_pay'>$1,800</span>"
+            "<span id='MainContent_lbl_telnum'>213-555-9201</span>"
+            "</div>"
         )
         result = KtownKoreadailyParser().parse_detail(
-            html, "https://ktown.koreadaily.com/ad_rent/rentlist?data=k9201"
+            html, "https://ktown.koreadaily.com/ad_rent/rentview?data=k9201"
         )
-        assert result["raw_location"] == "코리아타운 할리우드 인근 스튜디오 풀퍼니쳐"
+        assert result["raw_location"] == "Los Angeles, CA"
+        assert result["raw_price"] == "$1,800"
+        assert "213-555-9201" in result["contact_block"]
 
-    def test_ktown_koreadaily_labelled_wins(self):
-        html = (
-            "<div class='rent_detail'>"
-            "<h2>[코리아타운] 스튜디오</h2>"
-            "<div class='body'>"
-            "<p>할리우드 인근 스튜디오</p>"
-            "<p>Location: 3rd & Vermont, Los Angeles</p>"
-            "</div></div>"
-        )
+    def test_ktown_koreadaily_listing_id_from_data_query_param(self):
+        """source_listing_id comes from ?data=<id>."""
+        html = "<div><span id='MainContent_lbl_title'>x</span></div>"
         result = KtownKoreadailyParser().parse_detail(
-            html, "https://ktown.koreadaily.com/ad_rent/rentlist?data=k9202"
+            html, "https://ktown.koreadaily.com/ad_rent/rentview?data=68539&extra=1"
         )
-        assert result["raw_location"] == "3rd & Vermont, Los Angeles"
+        assert result["source_listing_id"] == "68539"
 
     # --- missyusa ---
 

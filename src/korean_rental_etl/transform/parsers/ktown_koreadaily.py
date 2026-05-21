@@ -1,4 +1,14 @@
-"""Ktown Koreadaily parser."""
+"""Ktown Koreadaily parser.
+
+ktown.koreadaily.com is an ASP.NET (Web Forms) classifieds board. Detail
+pages expose stable element ids of the form `MainContent_lbl_*` that map
+directly to the listing's structured fields, so we read those instead of
+selectors that are sensitive to layout changes.
+
+Detail URLs look like
+https://ktown.koreadaily.com/ad_rent/rentview?data=<id> where <id> is the
+listing id.
+"""
 
 from __future__ import annotations
 
@@ -9,16 +19,17 @@ from bs4 import BeautifulSoup
 
 from korean_rental_etl.transform.parsers._common import (
     compute_content_hash,
-    extract_body_text,
-    extract_labelled_field,
     extract_text,
-    infer_location,
 )
 from korean_rental_etl.transform.parsers.base_parser import BaseParser
 
 
+def _id_text(soup: BeautifulSoup, element_id: str) -> str:
+    return extract_text(soup.find(id=element_id))
+
+
 class KtownKoreadailyParser(BaseParser):
-    """Parser for ktown.koreadaily.com/ad_rent/rentlist."""
+    """Parser for ktown.koreadaily.com/ad_rent/rentview."""
 
     def __init__(self) -> None:
         super().__init__("ktown_koreadaily")
@@ -27,36 +38,56 @@ class KtownKoreadailyParser(BaseParser):
         """Parse Ktown Koreadaily detail page."""
         soup = BeautifulSoup(html, "html.parser")
 
-        # Extract listing ID from data query param
+        # Listing id from ?data=<id> query param.
         source_listing_id = ""
-        match = re.search(r"data=([^&]+)", url)
+        match = re.search(r"[?&]data=([^&#]+)", url)
         if match:
             source_listing_id = match.group(1)
 
-        # Title from .rent_detail h2
-        title_ko = extract_text(soup.select_one(".rent_detail h2"))
+        title_ko = _id_text(soup, "MainContent_lbl_title")
+        raw_posted_at = _id_text(soup, "MainContent_lbl_boardregdate")
+        raw_price = _id_text(soup, "MainContent_lbl_pay") or _id_text(
+            soup, "MainContent_lbl_pay2"
+        )
 
-        # Body from .rent_detail .body
-        body_ko = extract_body_text(soup, [".rent_detail .body"])
+        city = _id_text(soup, "MainContent_lbl_city")
+        state = _id_text(soup, "MainContent_lbl_state")
+        if city and state:
+            raw_location = f"{city}, {state}"
+        else:
+            raw_location = city or state
 
-        # Extract labelled fields from body text
-        labelled_location = extract_labelled_field(body_ko, ["위치", "Location"])
-        raw_location = infer_location(title_ko, body_ko, labelled_location)
-        raw_price = "\n".join(
-            [
-                extract_labelled_field(body_ko, ["월세"]),
-                extract_labelled_field(body_ko, ["보증금"]),
-                extract_labelled_field(body_ko, ["전세"]),
-                extract_labelled_field(body_ko, ["Rent"]),
-            ]
-        ).strip()
-        raw_price = "\n".join(line for line in raw_price.split("\n") if line)
+        # Build a body summary from the structured fields. ktown listings on
+        # this board are short ads; the title + structured fields ARE the
+        # body, there's no separate description blob.
+        category = _id_text(soup, "MainContent_lbl_joblist")
+        bedrooms = _id_text(soup, "MainContent_lbl_bedroom")
+        bathrooms = _id_text(soup, "MainContent_lbl_bathroom")
+        size = _id_text(soup, "MainContent_lbl_sq")
 
-        # Date from body text
-        raw_posted_at = extract_labelled_field(body_ko, ["작성일", "Posted", "Date"])
+        body_lines = [title_ko] if title_ko else []
+        if category:
+            body_lines.append(f"형태: {category}")
+        if bedrooms and bedrooms != "0":
+            body_lines.append(f"Bedrooms: {bedrooms}")
+        if bathrooms and bathrooms != "0":
+            body_lines.append(f"Bathrooms: {bathrooms}")
+        if size and size not in ("0 sq ft", "0"):
+            body_lines.append(f"크기: {size}")
+        body_ko = "\n".join(body_lines)
 
-        # Contact from labelled field
-        contact_block = extract_labelled_field(body_ko, ["연락처", "이메일", "카카오", "Contact"])
+        # Contact block
+        contact_parts = []
+        phone = _id_text(soup, "MainContent_lbl_telnum")
+        if phone:
+            contact_parts.append(f"전화: {phone}")
+        writer = _id_text(soup, "MainContent_lbl_writer")
+        company = _id_text(soup, "MainContent_lbl_companyname")
+        if writer:
+            contact_parts.append(f"작성자: {writer}")
+        if company:
+            contact_parts.append(f"회사: {company}")
+        contact_block = "\n".join(contact_parts)
 
         return {
             "title_ko": title_ko,

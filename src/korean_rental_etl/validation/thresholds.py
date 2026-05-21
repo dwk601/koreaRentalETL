@@ -141,6 +141,57 @@ def check_fk_integrity() -> ThresholdResult:
     return ThresholdResult("fk_integrity", passed, message)
 
 
+def check_transform_success_rate(
+    run_id: int, min_success_rate: float = 0.10
+) -> ThresholdResult:
+    """Hard-fail when a transform run attempted work but parsed almost nothing.
+
+    The previous validation suite only had a soft check that compared parsed
+    rows against a rolling average, which did not catch a 100%-failure run on
+    an empty-history database (the average defaulted to 0 and the check
+    silently passed). This check looks at the absolute counts on the run
+    itself: if the run attempted at least one row (rows_failed > 0) and the
+    success rate falls below ``min_success_rate``, fail hard.
+
+    Args:
+        run_id: Audit run ID.
+        min_success_rate: Minimum acceptable rows_transformed / total ratio
+            (default 10%).
+
+    Returns:
+        ThresholdResult.
+    """
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT rows_transformed, rows_failed FROM audit.etl_runs WHERE id = %s",
+            (run_id,),
+        )
+        row = cur.fetchone()
+
+    if not row:
+        return ThresholdResult(
+            "transform_success_rate", False, f"Run {run_id} not found"
+        )
+
+    transformed = row["rows_transformed"] or 0
+    failed = row["rows_failed"] or 0
+    total = transformed + failed
+
+    if total == 0:
+        # Nothing was attempted -- not this check's responsibility to flag.
+        return ThresholdResult(
+            "transform_success_rate", True, "No rows attempted"
+        )
+
+    rate = transformed / total
+    passed = rate >= min_success_rate
+    message = (
+        f"Success rate: {rate:.1%} ({transformed}/{total}); "
+        f"min {min_success_rate:.0%}"
+    )
+    return ThresholdResult("transform_success_rate", passed, message)
+
+
 def get_audit_run_id_by_airflow_run_id(airflow_run_id: str, task_id: str = "transform") -> int:
     """Find the audit run DB ID for a given Airflow run_id or numeric DB ID."""
     with get_cursor() as cur:
@@ -181,8 +232,11 @@ def validate_run(run_id: int) -> dict[str, Any]:
     parsed_rows_res = check_parsed_rows_threshold(run_id)
     null_rate_res = check_null_rate_threshold(run_id)
     fk_integrity_res = check_fk_integrity()
+    transform_success_res = check_transform_success_rate(run_id)
 
-    # Apply hybrid policy: parsed_rows is soft, others are hard.
+    # Apply hybrid policy: parsed_rows is soft (rolling-average comparison
+    # has too many false positives early on); transform_success_rate,
+    # null_rate, and fk_integrity are hard.
     soft_warning = False
     if not parsed_rows_res.passed:
         logger.warning("Soft validation warning (parsed_rows): %s", parsed_rows_res.message)
@@ -190,12 +244,14 @@ def validate_run(run_id: int) -> dict[str, Any]:
 
     # Check hard failures
     hard_failed = []
+    if not transform_success_res.passed:
+        hard_failed.append(transform_success_res.name)
     if not null_rate_res.passed:
         hard_failed.append(null_rate_res.name)
     if not fk_integrity_res.passed:
         hard_failed.append(fk_integrity_res.name)
 
-    results = [parsed_rows_res, null_rate_res, fk_integrity_res]
+    results = [parsed_rows_res, transform_success_res, null_rate_res, fk_integrity_res]
 
     report = {
         "run_id": run_id,

@@ -2,11 +2,30 @@ FROM apache/airflow:2.10.0-python3.11
 
 USER root
 
-# Install system build dependencies and libpq for Postgres integration
+# System dependencies:
+#   - build-essential, libpq-dev: building psycopg / installing native deps
+#   - lib*: runtime libs Chromium needs (used by Patchright/Playwright for the
+#     stealth fetcher in missyusa and radiokorea scrapers).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libasound2 \
+        libatspi2.0-0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,6 +40,12 @@ COPY --chown=airflow:root src/ ./src/
 
 # Install the package locally using pip to put the cli executable on PATH
 RUN pip install --no-cache-dir .
+
+# Install Chromium browser binaries for Patchright (used by missyusa and
+# radiokorea via StealthyFetcher). This downloads ~150MB to
+# /home/airflow/.cache/ms-playwright. Without this step those scrapers fail
+# at runtime with "Executable doesn't exist at chromium-XXXX/chrome-linux64".
+RUN patchright install chromium
 
 # Bake DAGs and source-config into the image so they ship with the deploy.
 # Coolify removes the build checkout after image build, so a host bind mount
