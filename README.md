@@ -54,6 +54,26 @@ flowchart LR
 **Load**: PostgreSQL with PostGIS and pg_trgm extensions; upsert with audit trail.  
 **Orchestration**: Apache Airflow LocalExecutor; 6-hour schedule with email alerts via MailHog (dev) or SMTP relay (prod).
 
+### Extract: 30-Day Cutoff and Pagination
+
+The extract step implements a 30-day cutoff to avoid filling the warehouse with stale rentals. Each scraper:
+
+1. **Parses list-page dates** from each listing row (e.g., "05.19" for May 19, "16:53" for today's time-only format).
+2. **Paginates through list pages** using `?page=N` query parameters, walking pages until a row with `post_date < today - EXTRACT_CUTOFF_DAYS` is encountered.
+3. **Stops pagination early** when a stale row is found, saving bandwidth and API calls.
+4. **Filters at extract time** via `BaseScraper.extract()`, skipping detail-page fetches for stale listings.
+
+**Initial vs. steady-state behavior:**
+- **Initial run** (empty database): Backfills up to 30 days of history by walking all pages until cutoff.
+- **Steady-state run** (6-hour schedule): Pulls only new listings (typically page 1) because older URLs are cached in Redis (14-day TTL).
+
+**Deduplication layers** (unchanged):
+- Redis URL cache (14-day sliding TTL) skips re-fetching already-seen URLs.
+- `raw.scraped_pages` ON CONFLICT DO NOTHING on `(source_id, url, content_hash)` prevents duplicate HTML storage.
+- `staging.listings_staging` UNIQUE `(source_id, source_listing_id)` + UPSERT on `public.listings` ensures canonical dedup.
+
+Configure the cutoff window via `EXTRACT_CUTOFF_DAYS` (default 30 days).
+
 ## Sources
 
 | Name | URL | Status |
@@ -111,6 +131,7 @@ Copy `.env.example` to `.env` and edit the following keys:
 | `DOWNLOAD_DELAY_SEC` | No | `2.0` | Scraper delay between requests |
 | `CONCURRENT_REQUESTS` | No | `2` | Scraper concurrent request limit |
 | `MAX_RETRIES` | No | `3` | Scraper retry count |
+| `EXTRACT_CUTOFF_DAYS` | No | `30` | Days of history to extract; initial runs backfill this window, steady-state runs only pull new listings |
 | `SMTP_HOST` | No | `localhost` | SMTP server for Airflow alerts |
 | `SMTP_PORT` | No | `1025` | SMTP port |
 | `SMTP_TO` | No | `admin@example.com` | Email recipient for Airflow alerts |
