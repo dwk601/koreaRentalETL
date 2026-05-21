@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -57,6 +58,7 @@ class BaseScraper(ABC):
         self.source_id = source_id
         self._download_delay_sec = download_delay_sec
         self._max_retries = max_retries
+        self.cutoff_days = int(os.environ.get("EXTRACT_CUTOFF_DAYS", "30"))
 
     def fetch_page(self, url: str, **kwargs: Any) -> Any:
         """Fetch a page using the configured fetcher with retry and ban detection.
@@ -294,6 +296,13 @@ class BaseScraper(ABC):
         try:
             for listing in self.crawl_list_pages():
                 url = listing["url"]
+
+                # Cutoff gate: skip if post_date is outside cutoff window
+                post_date = self._resolve_post_date(listing)
+                if not self._within_cutoff(post_date):
+                    skipped += 1
+                    logger.debug("Skipping stale URL: %s (post_date=%s)", url, post_date)
+                    continue
 
                 # Detail-page gating: skip if already seen in Redis
                 if redis_seen(self.source_name, url):
