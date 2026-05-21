@@ -9,6 +9,7 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from scrapling import Selector
 
@@ -48,6 +49,7 @@ class BaseScraper(ABC):
     fetcher_type: str = "Fetcher"
     source_id: int
     cutoff_days: int = 30
+    max_pages: int = 20
     _download_delay_sec: float = 2.0
     _max_retries: int = 3
     _backoff_base_sec: float = 5.0
@@ -272,6 +274,41 @@ class BaseScraper(ABC):
             "title": title,
             "location": extract_title_bracket(title),
         }
+
+    def _build_page_url(self, base_url: str, page_num: int) -> str:
+        """Build a paginated URL by adding or replacing the page query parameter.
+
+        Args:
+            base_url: Base URL (may already have query parameters).
+            page_num: Page number to set.
+
+        Returns:
+            URL with page parameter set or replaced.
+        """
+        parsed = urlparse(base_url)
+        query_params = dict(parse_qsl(parsed.query))
+        query_params["page"] = str(page_num)
+        new_query = urlencode(query_params)
+        return urlunparse(
+            (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+        )
+
+    def _paginated_list_urls(self, max_pages: int | None = None) -> Iterator[str]:
+        """Generate paginated list URLs up to max_pages.
+
+        Args:
+            max_pages: Maximum number of pages to generate. Defaults to self.max_pages.
+
+        Yields:
+            Paginated URLs for pages 1 through max_pages.
+        """
+        if max_pages is None:
+            max_pages = self.max_pages
+        list_url = getattr(self, "_list_url", None)
+        if not isinstance(list_url, str):
+            raise ValueError("_list_url not set on scraper")
+        for page_num in range(1, max_pages + 1):
+            yield self._build_page_url(list_url, page_num)
 
     def extract(self, dag_id: str | None = None, run_id: str | None = None) -> tuple[int, int]:
         """Run full extraction for this source.
