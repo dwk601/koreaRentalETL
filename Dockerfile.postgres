@@ -1,0 +1,14 @@
+FROM postgis/postgis:16-3.4
+
+# Bake schema migrations into the image so they ship with the deploy
+# instead of relying on a host bind mount (Coolify removes the build
+# checkout after the image is built, so a bind mount of ./sql/migrations
+# would be empty at runtime).
+#
+# Postgres' default entrypoint executes /docker-entrypoint-initdb.d/*.sql
+# in lexical order on first init of an empty data volume. For an existing
+# (non-empty) volume, the migrations must be applied manually:
+#
+#   docker exec <postgres-container> bash -c 'for f in /docker-entrypoint-initdb.d/*.sql; do \
+#     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$f"; done'
+COPY sql/migrations/ /docker-entrypoint-initdb.d/

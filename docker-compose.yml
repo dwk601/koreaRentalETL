@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     container_name: korean_rental_postgres
     restart: unless-stopped
     environment:
@@ -10,7 +12,6 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-etl_user} -d ${POSTGRES_DB:-korean_rental}"]
       interval: 5s
@@ -78,7 +79,6 @@ services:
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD must be set}
 
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
     command:
       - bash
@@ -124,7 +124,6 @@ services:
       - "traefik.http.routers.airflow.tls.certresolver=letsencrypt"
       - "traefik.http.services.airflow.loadbalancer.server.port=8080"
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health"]
@@ -153,7 +152,6 @@ services:
       REDIS_HOST: redis
 
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]

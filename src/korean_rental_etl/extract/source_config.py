@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -41,11 +42,37 @@ class SourcesConfig(BaseModel):
     sources: list[SourceConfig]
 
 
+def _resolve_default_config_path() -> Path:
+    """Find sources.yml across dev-mode, installed-image, and env-var paths.
+
+    Resolution order:
+    1. KOREAN_RENTAL_ETL_CONFIG_PATH env var (explicit override).
+    2. Repo-relative path (dev mode, when running from a checked-out tree).
+    3. /opt/airflow/project/config/sources.yml (baked-in production image).
+    4. Falls back to the dev-mode path so the FileNotFoundError below carries
+       a meaningful message.
+    """
+    env_path = os.environ.get("KOREAN_RENTAL_ETL_CONFIG_PATH")
+    if env_path:
+        return Path(env_path)
+
+    candidates = [
+        Path(__file__).parent.parent.parent.parent / "config" / "sources.yml",
+        Path("/opt/airflow/project/config/sources.yml"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
 def load_sources(config_path: Path | str | None = None) -> SourcesConfig:
     """Load sources from YAML config file.
 
     Args:
-        config_path: Path to sources.yml. Defaults to config/sources.yml relative to project root.
+        config_path: Path to sources.yml. Defaults to the first match of
+            KOREAN_RENTAL_ETL_CONFIG_PATH env var, the repo-relative path,
+            or the baked-in production image path.
 
     Returns:
         Parsed SourcesConfig.
@@ -55,7 +82,7 @@ def load_sources(config_path: Path | str | None = None) -> SourcesConfig:
         ValidationError: If config is invalid.
     """
     if config_path is None:
-        config_path = Path(__file__).parent.parent.parent.parent / "config" / "sources.yml"
+        config_path = _resolve_default_config_path()
     else:
         config_path = Path(config_path)
 
