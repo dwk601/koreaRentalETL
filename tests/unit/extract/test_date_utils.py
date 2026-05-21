@@ -86,3 +86,18 @@ class TestParseKoreanDate:
         assert parse_korean_date("12-30", today=today) == date(2025, 12, 30)
         # 01-04 is in the past (this year)
         assert parse_korean_date("01-04", today=today) == date(2026, 1, 4)
+
+    def test_hh_mm_returns_today(self) -> None:
+        today = date(2026, 5, 19)
+        assert parse_korean_date("16:53", today=today) == today
+        assert parse_korean_date("09:30", today=today) == today
+
+    def test_hh_mm_with_seconds(self) -> None:
+        today = date(2026, 5, 19)
+        assert parse_korean_date("16:53:42", today=today) == today
+        assert parse_korean_date("09:30:00", today=today) == today
+
+    def test_hh_mm_with_whitespace(self) -> None:
+        today = date(2026, 5, 19)
+        assert parse_korean_date("  16:53  ", today=today) == today
+        assert parse_korean_date("16:53 ", today=today) == today

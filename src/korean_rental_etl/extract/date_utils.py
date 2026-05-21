@@ -66,6 +66,11 @@ def parse_korean_date(s: str, today: date | None = None) -> date | None:
         except ValueError:
             pass
 
+    # Try HH:MM or HH:MM:SS (time-only, assume today)
+    match = re.match(r"(\d{1,2}):(\d{2})(?::(\d{2}))?$", s)
+    if match:
+        return today
+
     # Try relative formats
     if "방금전" in s or "방금" in s:
         return today
