@@ -74,13 +74,24 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD must be set}
 
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
-    command: >
-      bash -c "airflow db migrate &&
-               airflow users create --username admin --password ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD must be set} --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+    command:
+      - bash
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow users create \
+          --username admin \
+          --password "$$AIRFLOW_ADMIN_PASSWORD" \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || true
 
   airflow-webserver:
     build:
