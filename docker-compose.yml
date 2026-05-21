@@ -70,8 +70,10 @@ services:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@korean_rental_airflow_postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@airflow_postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
 
     volumes:
       - ./airflow/dags:/opt/airflow/dags
@@ -93,8 +95,10 @@ services:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@korean_rental_airflow_postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@airflow_postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.airflow.rule=Host(`${AIRFLOW_HOST}`)"
@@ -125,8 +129,10 @@ services:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@korean_rental_airflow_postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD must be set}@airflow_postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
 
     volumes:
       - ./airflow/dags:/opt/airflow/dags
