@@ -104,6 +104,12 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     command: airflow webserver
 
   airflow-scheduler:
@@ -125,6 +131,12 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     command: airflow scheduler
 
 volumes:

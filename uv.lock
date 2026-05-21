@@ -1295,6 +1295,7 @@ dependencies = [
 [package.optional-dependencies]
 airflow = [
     { name = "apache-airflow" },
+    { name = "apache-airflow-providers-smtp" },
 ]
 dev = [
     { name = "mypy" },
@@ -1320,6 +1321,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "apache-airflow", marker = "extra == 'airflow'", specifier = ">=2.7.0" },
+    { name = "apache-airflow-providers-smtp", marker = "extra == 'airflow'", specifier = ">=1.0" },
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "click", specifier = ">=8.1.0" },
     { name = "fakeredis", marker = "extra == 'test'", specifier = ">=2.20.0" },

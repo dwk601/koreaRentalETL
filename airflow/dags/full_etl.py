@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.email import EmailOperator
+from airflow.providers.smtp.operators.smtp import EmailOperator
 
 # Default args with conservative retry
 default_args = {
