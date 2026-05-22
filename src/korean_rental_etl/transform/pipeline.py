@@ -80,8 +80,8 @@ def transform_row(
         return None
 
     # Check for required fields
-    if not parsed.get("title_ko") and not parsed.get("raw_price"):
-        logger.debug("Skipping row with no title_ko and no raw_price")
+    if not parsed.get("title_ko") and not parsed.get("body_ko") and not parsed.get("raw_price"):
+        logger.debug("Skipping row with no title_ko, body_ko, and raw_price")
         return None
 
     # Normalize price

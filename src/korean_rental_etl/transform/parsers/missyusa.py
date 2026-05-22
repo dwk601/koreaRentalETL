@@ -12,6 +12,7 @@ from korean_rental_etl.transform.parsers._common import (
     extract_body_text,
     extract_labelled_field,
     extract_text,
+    extract_text_first_match,
     infer_location,
 )
 from korean_rental_etl.transform.parsers.base_parser import BaseParser
@@ -33,11 +34,29 @@ class MissyusaParser(BaseParser):
         if match:
             source_listing_id = match.group(1)
 
-        # Title from .post_detail h1
-        title_ko = extract_text(soup.select_one(".post_detail h1"))
+        # Title extraction with fallbacks
+        title_selectors = [
+            "#readcontent h1",
+            "#readcontent h2",
+            ".submenu_view h2",
+            ".post_detail h1",
+            "h1",
+        ]
+        title_ko = extract_text_first_match(soup, title_selectors)
+        if not title_ko:
+            t = soup.find("title")
+            title_ko = t.get_text(strip=True) if t else ""
+        # Strip ' | missyUSA' suffix
+        for sfx in [" | missyUSA"]:
+            if title_ko.endswith(sfx):
+                title_ko = title_ko[: -len(sfx)].strip()
 
-        # Body from .post_detail .content
-        body_ko = extract_body_text(soup, [".post_detail .content"])
+        # Body extraction with fallbacks
+        body_selectors = ["#readcontent", ".submenu_view", ".post_detail .content"]
+        body_ko = extract_body_text(soup, body_selectors)
+        if not body_ko:
+            body_el = soup.find("body")
+            body_ko = extract_text(body_el) if body_el else ""
 
         # Extract labelled fields from body text
         labelled_location = extract_labelled_field(body_ko, ["위치", "Location"])

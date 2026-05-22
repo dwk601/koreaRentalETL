@@ -2,6 +2,7 @@
 
 import re
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from korean_rental_etl.extract.raw_writer import compute_content_hash  # noqa: F401
 from korean_rental_etl.text_utils import extract_title_bracket, first_body_line  # noqa: F401
@@ -9,6 +10,7 @@ from korean_rental_etl.text_utils import extract_title_bracket, first_body_line 
 __all__ = [
     "compute_content_hash",
     "extract_text",
+    "extract_text_first_match",
     "extract_labelled_field",
     "extract_body_text",
     "extract_contact_block",
@@ -18,7 +20,20 @@ __all__ = [
 ]
 
 
-def extract_text(element) -> str:
+def extract_text_first_match(soup: Any, selectors: list[str]) -> str:
+    """Try each selector in order and return the first non-empty extract_text result."""
+    if not soup or not selectors:
+        return ""
+    for selector in selectors:
+        element = soup.select_one(selector)
+        if element:
+            txt = extract_text(element)
+            if txt:
+                return txt
+    return ""
+
+
+def extract_text(element: Any) -> str:
     """Extract and clean text from an element."""
     if not element:
         return ""
@@ -57,7 +72,7 @@ def parse_korean_date(date_str: str) -> str | None:
     return None
 
 
-def parse_korean_price(price_str: str) -> dict:
+def parse_korean_price(price_str: str) -> dict[str, Any]:
     """Parse Korean price strings.
 
     Returns: {raw_price_ko, rent_monthly_usd, deposit_usd, lease_type, currency_raw}
@@ -72,7 +87,7 @@ def parse_korean_price(price_str: str) -> dict:
         }
 
     price_str = price_str.strip()
-    result = {
+    result: dict[str, Any] = {
         "raw_price_ko": price_str,
         "rent_monthly_usd": None,
         "deposit_usd": None,
@@ -107,7 +122,7 @@ def parse_korean_price(price_str: str) -> dict:
     return result
 
 
-def extract_contact_block(element) -> str:
+def extract_contact_block(element: Any) -> str:
     """Extract contact info block (phone, email, kakao)."""
     if not element:
         return ""
@@ -141,7 +156,7 @@ def extract_labelled_field(text: str, labels: list[str]) -> str:
     return ""
 
 
-def extract_body_text(soup: object, selectors: list[str]) -> str:
+def extract_body_text(soup: Any, selectors: list[str]) -> str:
     """Extract clean text from the first matching CSS selector.
 
     Preserves line breaks from <p> and <br> tags.

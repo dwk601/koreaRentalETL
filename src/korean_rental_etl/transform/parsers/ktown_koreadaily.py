@@ -46,16 +46,11 @@ class KtownKoreadailyParser(BaseParser):
 
         title_ko = _id_text(soup, "MainContent_lbl_title")
         raw_posted_at = _id_text(soup, "MainContent_lbl_boardregdate")
-        raw_price = _id_text(soup, "MainContent_lbl_pay") or _id_text(
-            soup, "MainContent_lbl_pay2"
-        )
+        raw_price = _id_text(soup, "MainContent_lbl_pay") or _id_text(soup, "MainContent_lbl_pay2")
 
         city = _id_text(soup, "MainContent_lbl_city")
         state = _id_text(soup, "MainContent_lbl_state")
-        if city and state:
-            raw_location = f"{city}, {state}"
-        else:
-            raw_location = city or state
+        raw_location = f"{city}, {state}" if city and state else city or state
 
         # Build a body summary from the structured fields. ktown listings on
         # this board are short ads; the title + structured fields ARE the

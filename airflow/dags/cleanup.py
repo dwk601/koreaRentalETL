@@ -43,4 +43,3 @@ with DAG(
     )
 
     mark_stale >> purge_raw
-

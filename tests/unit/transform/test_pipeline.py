@@ -45,8 +45,8 @@ class TestTransformRow:
                 assert result["lat"] == 34.05
                 assert result["lon"] == -118.25
 
-    def test_skip_row_with_no_title_and_no_price(self):
-        """Skip row if both title_ko and raw_price are empty."""
+    def test_drops_all_empty(self):
+        """Skip row if title_ko, body_ko, and raw_price are all empty."""
         raw_page = {
             "html_content": "<html><body>test</body></html>",
             "url": "https://svkoreans.com/rent_housing/99999",
@@ -56,7 +56,7 @@ class TestTransformRow:
         mock_parser = MagicMock()
         mock_parser.parse_detail.return_value = {
             "title_ko": "",
-            "body_ko": "Some body",
+            "body_ko": "",
             "raw_price": "",
             "raw_location": "LA",
             "raw_posted_at": "2024-05-01",
@@ -71,6 +71,90 @@ class TestTransformRow:
 
             result = transform_row("svkoreans", 1, raw_page)
             assert result is None
+
+    def test_keeps_title_only(self):
+        """Keep row if only title_ko is present."""
+        raw_page = {
+            "html_content": "<html><body>test</body></html>",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        mock_parser = MagicMock()
+        mock_parser.parse_detail.return_value = {
+            "title_ko": "only title",
+            "body_ko": "",
+            "raw_price": "",
+            "raw_location": "LA",
+            "raw_posted_at": "2024-05-01",
+            "contact_block": "",
+            "source_listing_id": "99999",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        with patch("korean_rental_etl.transform.pipeline._get_parser") as mock_get_parser:
+            mock_get_parser.return_value = mock_parser
+
+            result = transform_row("svkoreans", 1, raw_page)
+            assert result is not None
+            assert result["title_ko"] == "only title"
+
+    def test_keeps_body_only(self):
+        """Keep row if only body_ko is present."""
+        raw_page = {
+            "html_content": "<html><body>test</body></html>",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        mock_parser = MagicMock()
+        mock_parser.parse_detail.return_value = {
+            "title_ko": "",
+            "body_ko": "just a body",
+            "raw_price": "",
+            "raw_location": "LA",
+            "raw_posted_at": "2024-05-01",
+            "contact_block": "",
+            "source_listing_id": "99999",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        with patch("korean_rental_etl.transform.pipeline._get_parser") as mock_get_parser:
+            mock_get_parser.return_value = mock_parser
+
+            result = transform_row("svkoreans", 1, raw_page)
+            assert result is not None
+            assert result["body_ko"] == "just a body"
+
+    def test_keeps_price_only(self):
+        """Keep row if only raw_price is present."""
+        raw_page = {
+            "html_content": "<html><body>test</body></html>",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        mock_parser = MagicMock()
+        mock_parser.parse_detail.return_value = {
+            "title_ko": "",
+            "body_ko": "",
+            "raw_price": "$1,500",
+            "raw_location": "LA",
+            "raw_posted_at": "2024-05-01",
+            "contact_block": "",
+            "source_listing_id": "99999",
+            "url": "https://svkoreans.com/rent_housing/99999",
+            "content_hash": "b" * 64,
+        }
+
+        with patch("korean_rental_etl.transform.pipeline._get_parser") as mock_get_parser:
+            mock_get_parser.return_value = mock_parser
+
+            result = transform_row("svkoreans", 1, raw_page)
+            assert result is not None
+            assert result["rent_monthly_usd"] == 1500.00
 
     def test_geocode_failure_is_non_fatal(self):
         """Geocoding failure should not prevent row insertion."""

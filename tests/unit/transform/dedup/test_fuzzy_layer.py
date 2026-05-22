@@ -176,6 +176,7 @@ class TestMultiCityRegression:
 
     def test_listings_in_multiple_cities_all_appear_in_output(self):
         from datetime import UTC, datetime
+
         from korean_rental_etl.transform.dedup.fuzzy_layer import find_duplicates
 
         now = datetime.now(UTC).isoformat()

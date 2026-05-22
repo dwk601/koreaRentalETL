@@ -12,6 +12,7 @@ from korean_rental_etl.transform.parsers._common import (
     extract_body_text,
     extract_labelled_field,
     extract_text,
+    extract_text_first_match,
     infer_location,
 )
 from korean_rental_etl.transform.parsers.base_parser import BaseParser
@@ -33,11 +34,26 @@ class GTKSAParser(BaseParser):
         if match:
             source_listing_id = match.group(1)
 
-        # Title from .view_title
-        title_ko = extract_text(soup.select_one(".view_title"))
+        # Title extraction with fallbacks
+        title_selectors = ["#bo_v_tit", "#bo_v_atc_title", "#hd_h1", ".view_title"]
+        title_ko = extract_text_first_match(soup, title_selectors)
+        if not title_ko:
+            t = soup.find("title")
+            title_ko = t.get_text(strip=True) if t else ""
+        # Strip gnuboard5 ' > 카테고리' suffix
+        if " > " in title_ko:
+            title_ko = title_ko.split(" > ", 1)[0].strip()
+        # Strip ' | GTKSA' suffix
+        for sfx in [" | GTKSA"]:
+            if title_ko.endswith(sfx):
+                title_ko = title_ko[: -len(sfx)].strip()
 
-        # Body from .view_content
-        body_ko = extract_body_text(soup, [".view_content"])
+        # Body extraction with fallbacks
+        body_selectors = ["#bo_v_atc #bo_v_con", "#bo_v_atc", "#bo_v_con", ".view_content"]
+        body_ko = extract_body_text(soup, body_selectors)
+        if not body_ko:
+            body_el = soup.find("body")
+            body_ko = extract_text(body_el) if body_el else ""
 
         # Extract labelled fields from body text
         labelled_location = extract_labelled_field(body_ko, ["위치", "Location"])

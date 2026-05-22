@@ -79,6 +79,8 @@ class TestGTKSAParser:
 
         assert result["source_listing_id"] == "1001"
         assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "[애틀랜타] 룸메이트 구합니다 $800"
+        assert "애틀랜타 버키드 지역" in result["body_ko"]
 
     def test_detail_1002(self, fixture_dir):
         """Parse GTKSA detail_1002.html."""
@@ -117,6 +119,8 @@ class TestMissyusaParser:
 
         assert result["source_listing_id"] == "2001"
         assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "[뉴욕] 맨하탄 스튜디오 월세 $2,800"
+        assert "맨하탄 미드타운" in result["body_ko"]
 
     def test_detail_m2002(self, fixture_dir):
         """Parse Missyusa detail_m2002.html."""
@@ -191,6 +195,8 @@ class TestRadiokoreaParser:
 
         assert result["source_listing_id"] == "4001"
         assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "[OC] 풀러턴 2베드 콘도 $2,400"
+        assert "OC 풀러턴" in result["body_ko"]
 
     def test_detail_r4002(self, fixture_dir):
         """Parse Radio Korea detail_r4002.html."""

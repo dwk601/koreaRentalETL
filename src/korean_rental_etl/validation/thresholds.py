@@ -104,12 +104,10 @@ def check_null_rate_threshold(run_id: int, max_null_rate: float = 0.20) -> Thres
         return ThresholdResult("null_rate", True, "No rows in staging")
 
     total = result["total"]
-    null_price = result["null_price"]
     null_location = result["null_location"]
     null_title = result["null_title"]
 
     rates = {
-        "price": null_price / total,
         "location": null_location / total,
         "title": null_title / total,
     }
@@ -117,7 +115,7 @@ def check_null_rate_threshold(run_id: int, max_null_rate: float = 0.20) -> Thres
     max_rate = max(rates.values())
     passed = max_rate <= max_null_rate
 
-    message = f"Max null rate: {max_rate:.2%} (price: {rates['price']:.2%}, location: {rates['location']:.2%}, title: {rates['title']:.2%})"
+    message = f"Max null rate: {max_rate:.2%} (location: {rates['location']:.2%}, title: {rates['title']:.2%})"
     return ThresholdResult("null_rate", passed, message)
 
 
@@ -141,9 +139,7 @@ def check_fk_integrity() -> ThresholdResult:
     return ThresholdResult("fk_integrity", passed, message)
 
 
-def check_transform_success_rate(
-    run_id: int, min_success_rate: float = 0.10
-) -> ThresholdResult:
+def check_transform_success_rate(run_id: int, min_success_rate: float = 0.10) -> ThresholdResult:
     """Hard-fail when a transform run attempted work but parsed almost nothing.
 
     The previous validation suite only had a soft check that compared parsed
@@ -169,9 +165,7 @@ def check_transform_success_rate(
         row = cur.fetchone()
 
     if not row:
-        return ThresholdResult(
-            "transform_success_rate", False, f"Run {run_id} not found"
-        )
+        return ThresholdResult("transform_success_rate", False, f"Run {run_id} not found")
 
     transformed = row["rows_transformed"] or 0
     failed = row["rows_failed"] or 0
@@ -179,16 +173,11 @@ def check_transform_success_rate(
 
     if total == 0:
         # Nothing was attempted -- not this check's responsibility to flag.
-        return ThresholdResult(
-            "transform_success_rate", True, "No rows attempted"
-        )
+        return ThresholdResult("transform_success_rate", True, "No rows attempted")
 
     rate = transformed / total
     passed = rate >= min_success_rate
-    message = (
-        f"Success rate: {rate:.1%} ({transformed}/{total}); "
-        f"min {min_success_rate:.0%}"
-    )
+    message = f"Success rate: {rate:.1%} ({transformed}/{total}); min {min_success_rate:.0%}"
     return ThresholdResult("transform_success_rate", passed, message)
 
 

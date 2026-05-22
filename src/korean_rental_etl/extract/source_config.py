@@ -81,10 +81,7 @@ def load_sources(config_path: Path | str | None = None) -> SourcesConfig:
         FileNotFoundError: If config file doesn't exist.
         ValidationError: If config is invalid.
     """
-    if config_path is None:
-        config_path = _resolve_default_config_path()
-    else:
-        config_path = Path(config_path)
+    config_path = _resolve_default_config_path() if config_path is None else Path(config_path)
 
     if not config_path.exists():
         raise FileNotFoundError(f"Sources config not found: {config_path}")

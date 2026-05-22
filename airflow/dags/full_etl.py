@@ -68,4 +68,3 @@ with DAG(
 
     # Task dependencies
     health_check >> extract >> transform >> load >> validate >> notify
-

@@ -95,7 +95,8 @@ def verify_source(src_config: Any) -> dict[str, Any]:
             result["list_duration_s"] = round(time.time() - t0, 2)
             result["listings_collected"] = len(listings)
             result["sample_listings"] = [
-                {"title": l.get("title", "")[:80], "url": l.get("url", "")} for l in listings[:3]
+                {"title": lst.get("title", "")[:80], "url": lst.get("url", "")}
+                for lst in listings[:3]
             ]
             result["list_ok"] = len(listings) > 0 and not detector.fixture_fallback
         except Exception as e:
