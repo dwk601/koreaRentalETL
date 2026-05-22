@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from korean_rental_etl.extract.base_scraper import BaseScraper
 from korean_rental_etl.extract.date_utils import parse_korean_date
@@ -13,6 +14,13 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
+
+
+def _canonicalize_detail_url(url: str) -> str:
+    """Remove the `page` query param so the same listing collapses to one canonical URL."""
+    parsed = urlparse(url)
+    params = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "page"]
+    return urlunparse(parsed._replace(query=urlencode(params)))
 
 
 class RadiokoreaScraper(BaseScraper):
@@ -27,7 +35,7 @@ class RadiokoreaScraper(BaseScraper):
     source_name = "radiokorea"
     fetcher_type = "StealthyFetcher"
     _list_url = "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate"
-    max_pages = 10  # Lower cap due to Cloudflare solve cost per page
+    max_pages = 3  # Lower cap due to Cloudflare solve cost per page
 
     # StealthyFetcher kwargs needed to bypass Cloudflare on radiokorea.com
     _fetch_kwargs: dict[str, Any] = {
@@ -76,6 +84,8 @@ class RadiokoreaScraper(BaseScraper):
                         full_url = f"https://radiokorea.com{href}"
                     else:
                         full_url = f"https://radiokorea.com/bulletin/bbs/{href.lstrip('./')}"
+
+                full_url = _canonicalize_detail_url(full_url)
 
                 match = re.search(r"wr_id=(\d+)", full_url)
                 if not match:

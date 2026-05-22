@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 import pytest
 
@@ -111,10 +114,82 @@ class TestRadiokoreaScraper:
             assert "title" in listing
             assert listing["url"].startswith("https://radiokorea.com/")
             assert "wr_id=" in listing["url"]
+            assert "page=" not in listing["url"]
             assert listing["source_listing_id"].isdigit()
             assert len(listing["title"]) > 0
             # Must not pick up notice rows
             assert "[공지]" not in listing["title"]
+            # Ensure post_date parses successfully
+            assert listing.get("post_date") is not None
+
+    def test_canonicalize_detail_url_strips_page(self) -> None:
+        from korean_rental_etl.extract.scrapers.radiokorea import _canonicalize_detail_url
+
+        # Strips page param when it is the last param
+        assert (
+            _canonicalize_detail_url(
+                "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968&page=8"
+            )
+            == "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968"
+        )
+
+        # Idempotent on URLs without page=
+        assert (
+            _canonicalize_detail_url(
+                "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968"
+            )
+            == "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968"
+        )
+
+        # Preserves other params (e.g. sca=foo)
+        assert (
+            _canonicalize_detail_url(
+                "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968&sca=foo&page=8"
+            )
+            == "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968&sca=foo"
+        )
+
+        # Strips page even when it is the first param
+        assert (
+            _canonicalize_detail_url(
+                "https://radiokorea.com/bulletin/bbs/board.php?page=8&bo_table=c_realestate&wr_id=2642968"
+            )
+            == "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate&wr_id=2642968"
+        )
+
+        # Strips when it is the only param
+        assert (
+            _canonicalize_detail_url("https://radiokorea.com/bulletin/bbs/board.php?page=8")
+            == "https://radiokorea.com/bulletin/bbs/board.php"
+        )
+
+    def test_max_pages_is_3(self, scraper: RadiokoreaScraper) -> None:
+        assert scraper.max_pages == 3
+
+    def test_pagination_stops_on_stale_row(
+        self, scraper: RadiokoreaScraper, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Force all dates to be stale
+        monkeypatch.setattr(scraper, "_within_cutoff", lambda *args, **kwargs: False)
+
+        # Track paginated URLs visited
+        visited_urls = []
+        original_paginated_list_urls = scraper._paginated_list_urls
+
+        def mock_paginated_list_urls() -> Iterator[str]:
+            for url in original_paginated_list_urls():
+                visited_urls.append(url)
+                yield url
+
+        monkeypatch.setattr(scraper, "_paginated_list_urls", mock_paginated_list_urls)
+
+        # Run crawler
+        listings = list(scraper.crawl_list_pages())
+
+        # Confirm we have listing rows from page 1 but stopped pagination after encountering stale rows
+        assert len(listings) >= 3
+        # Confirm we only visited the first page
+        assert len(visited_urls) == 1
 
 
 class TestExtractAll:

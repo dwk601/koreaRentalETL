@@ -42,6 +42,24 @@ def parse_korean_date(s: str, today: date | None = None) -> date | None:
             except ValueError:
                 pass
 
+    # Try MM-DD-YY, MM/DD/YY, MM.DD.YY
+    for sep in ["-", ".", "/"]:
+        match = re.match(
+            r"(\d{1,2})\s*"
+            + re.escape(sep)
+            + r"\s*(\d{1,2})\s*"
+            + re.escape(sep)
+            + r"\s*(\d{2})(?:\s|$)",
+            s,
+        )
+        if match:
+            try:
+                month, day = int(match.group(1)), int(match.group(2))
+                year = 2000 + int(match.group(3))
+                return date(year, month, day)
+            except ValueError:
+                pass
+
     # Try MM-DD, MM/DD, MM.DD (infer year)
     # Allow optional whitespace after the separator (e.g. "05. 20" — common on
     # Korean community boards like svkoreans).

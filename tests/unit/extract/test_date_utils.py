@@ -117,3 +117,18 @@ class TestParseKoreanDate:
         today = date(2026, 5, 19)
         assert parse_korean_date("  16:53  ", today=today) == today
         assert parse_korean_date("16:53 ", today=today) == today
+
+    def test_mm_dd_yy_dot(self) -> None:
+        assert parse_korean_date("05.20.26", today=date(2026, 5, 21)) == date(2026, 5, 20)
+
+    def test_mm_dd_yy_slash(self) -> None:
+        assert parse_korean_date("05/20/26", today=date(2026, 5, 21)) == date(2026, 5, 20)
+
+    def test_mm_dd_yy_hyphen(self) -> None:
+        assert parse_korean_date("05-20-26", today=date(2026, 5, 21)) == date(2026, 5, 20)
+
+    def test_mm_dd_yy_does_not_collide_with_mm_dd(self) -> None:
+        assert parse_korean_date("05.20", today=date(2026, 5, 21)) == date(2026, 5, 20)
+
+    def test_mm_dd_yy_year_2000_window(self) -> None:
+        assert parse_korean_date("01.05.30") == date(2030, 1, 5)
