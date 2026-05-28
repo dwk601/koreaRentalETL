@@ -83,6 +83,7 @@ Configure the cutoff window via `EXTRACT_CUTOFF_DAYS` (default 30 days).
 | missyusa | https://missyusa.com/town9 | Active |
 | ktown_koreadaily | https://ktown.koreadaily.com/ad_rent/rentlist | Active |
 | radiokorea | https://m.radiokorea.com/c_realestate | Active |
+| illinoisksa | https://illinoisksa.org/housing | Active |
 | hanintown | https://hanintown.com | Disabled |
 
 ## Quick Start
