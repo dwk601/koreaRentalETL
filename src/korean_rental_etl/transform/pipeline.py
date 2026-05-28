@@ -28,18 +28,30 @@ logger = logging.getLogger(__name__)
 def _get_parser(
     source_name: str,
 ) -> (
-    SVKoreansParser | GTKSAParser | KtownKoreadailyParser | MissyusaParser | RadiokoreaParser | None
+    SVKoreansParser
+    | GTKSAParser
+    | KtownKoreadailyParser
+    | MissyusaParser
+    | RadiokoreaParser
+    | IllinoisksaParser
+    | None
 ):
     """Get parser for a source."""
     parsers: dict[
         str,
-        SVKoreansParser | GTKSAParser | KtownKoreadailyParser | MissyusaParser | RadiokoreaParser,
+        SVKoreansParser
+        | GTKSAParser
+        | KtownKoreadailyParser
+        | MissyusaParser
+        | RadiokoreaParser
+        | IllinoisksaParser,
     ] = {
         "svkoreans": SVKoreansParser(),
         "gtksa": GTKSAParser(),
         "ktown_koreadaily": KtownKoreadailyParser(),
         "missyusa": MissyusaParser(),
         "radiokorea": RadiokoreaParser(),
+        "illinoisksa": IllinoisksaParser(),
     }
     return parsers.get(source_name)
 

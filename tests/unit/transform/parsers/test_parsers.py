@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from korean_rental_etl.transform.parsers.gtksa import GTKSAParser
+from korean_rental_etl.transform.parsers.illinoisksa import IllinoisksaParser
 from korean_rental_etl.transform.parsers.ktown_koreadaily import KtownKoreadailyParser
 from korean_rental_etl.transform.parsers.missyusa import MissyusaParser
 from korean_rental_etl.transform.parsers.radiokorea import RadiokoreaParser
@@ -366,3 +367,86 @@ class TestInferLocationWiring:
             html, "https://m.radiokorea.com/c_realestate?wr_id=9402"
         )
         assert result["raw_location"] == "Wilshire Blvd 3rd Street"
+
+
+class TestIllinoisksaParser:
+    """Test Illinois KSA parser."""
+
+    def test_detail_13972(self, fixture_dir):
+        """Parse illinoisksa detail_13972.html."""
+        html_file = fixture_dir / "illinoisksa" / "detail_13972.html"
+        html = html_file.read_text()
+        parser = IllinoisksaParser()
+        result = parser.parse_detail(
+            html, "https://illinoisksa.org/housing/?mod=document&uid=13972"
+        )
+
+        assert result["source_listing_id"] == "13972"
+        assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "08/15/26-07/31/27 Full year 서브리스 룸메이트 구합니다"
+        assert "UIUC" in result["body_ko"]
+        assert result["url"] == "https://illinoisksa.org/housing/?mod=document&uid=13972"
+        assert "2026-05-26" in result["raw_posted_at"]
+
+    def test_detail_13952(self, fixture_dir):
+        """Parse illinoisksa detail_13952.html."""
+        html_file = fixture_dir / "illinoisksa" / "detail_13952.html"
+        html = html_file.read_text()
+        parser = IllinoisksaParser()
+        result = parser.parse_detail(
+            html, "https://illinoisksa.org/housing/?mod=document&uid=13952"
+        )
+
+        assert result["source_listing_id"] == "13952"
+        assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "1B1B 아파트 서브리스 판매 (6/1~7/31)"
+        assert "Urbana" in result["body_ko"]
+        assert "2026-05-24" in result["raw_posted_at"]
+
+    def test_detail_13946(self, fixture_dir):
+        """Parse illinoisksa detail_13946.html."""
+        html_file = fixture_dir / "illinoisksa" / "detail_13946.html"
+        html = html_file.read_text()
+        parser = IllinoisksaParser()
+        result = parser.parse_detail(
+            html, "https://illinoisksa.org/housing/?mod=document&uid=13946"
+        )
+
+        assert result["source_listing_id"] == "13946"
+        assert len(result["content_hash"]) == 64
+        assert result["title_ko"] == "Champaign downtown 2B/1B rent 합니다."
+        assert "샴페인" in result["body_ko"]
+
+    def test_raw_location_inferred_from_title_bracket(self):
+        """When title has [bracket] but body has no 위치: label, raw_location is non-empty."""
+        html = (
+            "<div class='kboard-title'><h1>[Champaign] 서브리스 구합니다</h1></div>"
+            "<div class='kboard-detail'>"
+            "<div class='detail-attr detail-date'>작성일2026-05-26 16:46</div>"
+            "</div>"
+            "<div class='kboard-content'><div class='content-view'>"
+            "<p>캠퍼스 근처 방 찾고 있습니다</p>"
+            "</div></div>"
+        )
+        result = IllinoisksaParser().parse_detail(
+            html, "https://illinoisksa.org/housing/?mod=document&uid=99999"
+        )
+        assert result["raw_location"] != ""
+
+    def test_raw_price_extracted_when_labelled(self):
+        """When body has 월세: line, raw_price contains that value."""
+        html = (
+            "<div class='kboard-title'><h1>서브리스</h1></div>"
+            "<div class='kboard-detail'>"
+            "<div class='detail-attr detail-date'>작성일2026-05-26</div>"
+            "</div>"
+            "<div class='kboard-content'><div class='content-view'>"
+            "<p>월세: $900</p>"
+            "<p>보증금: $1000</p>"
+            "</div></div>"
+        )
+        result = IllinoisksaParser().parse_detail(
+            html, "https://illinoisksa.org/housing/?mod=document&uid=88888"
+        )
+        assert "$900" in result["raw_price"]
+        assert "$1000" in result["raw_price"]
