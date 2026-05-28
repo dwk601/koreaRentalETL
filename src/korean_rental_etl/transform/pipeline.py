@@ -16,6 +16,7 @@ from korean_rental_etl.transform.normalizers.date import normalize_date
 from korean_rental_etl.transform.normalizers.location import normalize_location
 from korean_rental_etl.transform.normalizers.price import normalize_price
 from korean_rental_etl.transform.parsers.gtksa import GTKSAParser
+from korean_rental_etl.transform.parsers.illinoisksa import IllinoisksaParser
 from korean_rental_etl.transform.parsers.ktown_koreadaily import KtownKoreadailyParser
 from korean_rental_etl.transform.parsers.missyusa import MissyusaParser
 from korean_rental_etl.transform.parsers.radiokorea import RadiokoreaParser

@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from korean_rental_etl.extract.scrapers.illinoisksa import IllinoisksaScraper, _canonicalize_detail_url
+from korean_rental_etl.extract.scrapers.illinoisksa import (
+    IllinoisksaScraper,
+    _canonicalize_detail_url,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -59,7 +62,7 @@ class TestIllinoisksaScraper:
 
     def test_post_dates_parsed(self, scraper: IllinoisksaScraper) -> None:
         listings = list(scraper.crawl_list_pages())
-        dated = [l for l in listings if l.get("post_date") is not None]
+        dated = [x for x in listings if x.get("post_date") is not None]
         assert dated, "Expected at least one listing with a parsed post_date"
 
     def test_canonicalize_detail_url_strips_pageid(self) -> None:
@@ -72,9 +75,7 @@ class TestIllinoisksaScraper:
 
         # Idempotent on URLs without pageid
         assert (
-            _canonicalize_detail_url(
-                "https://illinoisksa.org/housing/?mod=document&uid=13972"
-            )
+            _canonicalize_detail_url("https://illinoisksa.org/housing/?mod=document&uid=13972")
             == "https://illinoisksa.org/housing/?mod=document&uid=13972"
         )
 

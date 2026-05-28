@@ -35,6 +35,7 @@ class IllinoisksaScraper(BaseScraper):
     source_name = "illinoisksa"
     fetcher_type = "Fetcher"
     _list_url = "https://illinoisksa.org/housing/"
+    _fetch_kwargs: dict[str, Any] = {}
 
     def _build_page_url(self, base_url: str, page_num: int) -> str:
         """Build paginated URL using KBoard's ``pageid`` + ``mod=list`` pattern."""

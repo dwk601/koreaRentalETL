@@ -48,7 +48,7 @@ class TestSourcesConfig:
     def test_load_sources_default_path(self) -> None:
         config = load_sources()
         assert isinstance(config, SourcesConfig)
-        assert len(config.sources) == 6
+        assert len(config.sources) == 7
 
     def test_load_sources_custom_path(self, tmp_path: Path) -> None:
         yaml_content = """
