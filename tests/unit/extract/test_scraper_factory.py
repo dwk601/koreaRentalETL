@@ -6,6 +6,7 @@ import pytest
 
 from korean_rental_etl.extract.scraper_factory import ScraperFactory
 from korean_rental_etl.extract.scrapers.gtksa import GtksaScraper
+from korean_rental_etl.extract.scrapers.illinoisksa import IllinoisksaScraper
 from korean_rental_etl.extract.scrapers.ktown_koreadaily import KtownKoreadailyScraper
 from korean_rental_etl.extract.scrapers.missyusa import MissyusaScraper
 from korean_rental_etl.extract.scrapers.radiokorea import RadiokoreaScraper
@@ -44,6 +45,12 @@ class TestScraperFactory:
         assert isinstance(scraper, RadiokoreaScraper)
         assert scraper.source_id == 5
 
+    def test_create_illinoisksa(self) -> None:
+        config = SourceConfig(name="illinoisksa", url="https://illinoisksa.org")
+        scraper = ScraperFactory.create(config, source_id=6)
+        assert isinstance(scraper, IllinoisksaScraper)
+        assert scraper.source_id == 6
+
     def test_create_unknown_source(self) -> None:
         config = SourceConfig(name="unknown", url="https://example.com")
         with pytest.raises(ValueError, match="Unknown source"):
@@ -61,4 +68,5 @@ class TestScraperFactory:
         assert "missyusa" in sources
         assert "ktown_koreadaily" in sources
         assert "radiokorea" in sources
-        assert len(sources) == 5
+        assert "illinoisksa" in sources
+        assert len(sources) == 6

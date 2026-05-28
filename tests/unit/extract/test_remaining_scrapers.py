@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 import pytest
 
 from korean_rental_etl.extract.scrapers.gtksa import GtksaScraper
+from korean_rental_etl.extract.scrapers.illinoisksa import IllinoisksaScraper
 from korean_rental_etl.extract.scrapers.ktown_koreadaily import KtownKoreadailyScraper
 from korean_rental_etl.extract.scrapers.missyusa import MissyusaScraper
 from korean_rental_etl.extract.scrapers.radiokorea import RadiokoreaScraper
@@ -199,6 +200,7 @@ class TestExtractAll:
             MissyusaScraper(source_id=3),
             KtownKoreadailyScraper(source_id=4),
             RadiokoreaScraper(source_id=5),
+            IllinoisksaScraper(source_id=6),
         ]
         for scraper in scrapers:
             _force_fixture(monkeypatch, scraper)
@@ -221,6 +223,7 @@ class TestLocationSignal:
             MissyusaScraper(source_id=3),
             KtownKoreadailyScraper(source_id=4),
             RadiokoreaScraper(source_id=5),
+            IllinoisksaScraper(source_id=6),
         ]
         for scraper in scrapers:
             _force_fixture(monkeypatch, scraper)

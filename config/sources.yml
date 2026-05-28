@@ -52,6 +52,16 @@ sources:
     status: active
     description: "Radio Korea real estate board"
 
+  - name: illinoisksa
+    url: "https://illinoisksa.org"
+    path: "housing"
+    fetcher: Fetcher
+    schedule: "0 */6 * * *"
+    download_delay_sec: 2.0
+    concurrent_requests: 1
+    status: active
+    description: "KSA Illinois housing board (KBoard)"
+
   - name: hanintown
     url: "https://hanintown.com"
     path: null

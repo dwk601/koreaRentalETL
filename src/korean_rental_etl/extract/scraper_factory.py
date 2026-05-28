@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from korean_rental_etl.extract.scrapers.gtksa import GtksaScraper
+from korean_rental_etl.extract.scrapers.illinoisksa import IllinoisksaScraper
 from korean_rental_etl.extract.scrapers.ktown_koreadaily import KtownKoreadailyScraper
 from korean_rental_etl.extract.scrapers.missyusa import MissyusaScraper
 from korean_rental_etl.extract.scrapers.radiokorea import RadiokoreaScraper
@@ -24,6 +25,7 @@ class ScraperFactory:
         "missyusa": MissyusaScraper,
         "ktown_koreadaily": KtownKoreadailyScraper,
         "radiokorea": RadiokoreaScraper,
+        "illinoisksa": IllinoisksaScraper,
     }
 
     @classmethod
