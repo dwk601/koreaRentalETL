@@ -343,7 +343,8 @@ src/korean_rental_etl/
 │   │   ├── gtksa.py
 │   │   ├── missyusa.py
 │   │   ├── ktown_koreadaily.py
-│   │   └── radiokorea.py
+│   │   ├── radiokorea.py
+│   │   └── illinoisksa.py
 │   ├── raw_writer.py          # Write raw HTML to raw.scraped_pages
 │   └── source_config.py       # Load sources from config/sources.yml
 ├── transform/
@@ -383,7 +384,8 @@ airflow/
 sql/
 └── migrations/
     ├── 001_initial_schema.sql # Core schema + sources seed
-    └── 002_fix_fts_index.sql  # FTS index NULL handling fix
+    ├── 002_fix_fts_index.sql  # FTS index NULL handling fix
+    └── 003_add_illinoisksa.sql # Add illinoisksa.org/housing source
 ```
 
 ### Running Tests
