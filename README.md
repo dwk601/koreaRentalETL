@@ -1,38 +1,86 @@
+<!--
+  Section disposition map (Task 1 — audit trail for reviewers):
+    Current section                          → New location
+    ─────────────────────────────────────────────────────────────────────
+    Overview                                 → "What it does" (rewritten as 4 bullets)
+    Architecture                             → "Architecture (at a glance)" (mermaid kept inline)
+    Extract: 30-Day Cutoff and Pagination    → Reference > Extract cutoff (collapsible)
+    Sources                                  → Sources (visible, unchanged)
+    Quick Start                              → "Try it in 60 seconds" (rewritten)
+    Operator's Guide > Prerequisites         → Operate > Prerequisites
+    Operator's Guide > Configuration         → Operate > Configure (required visible; full in <details>)
+    Operator's Guide > Service Ports         → Operate > Service ports
+    Operator's Guide > Deploying             → Operate > Deploy (local visible; Coolify in <details>)
+    Operator's Guide > Verifying Deployment  → Operate > Verify
+    Operator's Guide > Triggering DAGs       → Operate > Trigger DAGs
+    Operator's Guide > Viewing Logs          → Operate > Logs
+    Operator's Guide > Troubleshooting       → Operate > Troubleshoot (each scenario in <details>)
+    Operator's Guide > Before Exposing…      → Operate > Production hardening (<details>)
+    Developer's Guide > Local Setup          → Develop > Local setup
+    Developer's Guide > Make Targets         → Develop > Make targets (top 5 visible; full in <details>)
+    Developer's Guide > Project Structure    → Develop > Project structure (layer summary visible; tree in <details>)
+    Developer's Guide > Running Tests        → Develop > Run tests
+    Developer's Guide > CLI Command Ref      → Reference > CLI reference (collapsible)
+    Developer's Guide > Adding a New Source  → Develop > Add a new source (inline)
+    Developer's Guide > Database Schema      → Reference > Database schema (table visible; ERD in <details>)
+    Developer's Guide > Migrations           → Reference > Migrations
+    DAG Schedules                            → Reference > DAG schedules
+    License                                  → License (unchanged)
+    NEW: Code Map callout                    → Develop > Code map
+-->
+
 # Korean Rental ETL
+
+![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Airflow](https://img.shields.io/badge/Apache%20Airflow-2.7%2B-017CEE)
+![Postgres](https://img.shields.io/badge/PostgreSQL-15%20%2B%20PostGIS-336791)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D)
+![Docker](https://img.shields.io/badge/Docker%20Compose-v2-2496ED)
+
+ETL pipeline that scrapes Korean rental listings from community boards, normalizes them, and loads them into a searchable PostgreSQL warehouse.
+
+For operators deploying the stack, contributors adding new sources, and anyone querying the rental data.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
+- [What it does](#what-it-does)
+- [Architecture (at a glance)](#architecture-at-a-glance)
+- [Try it in 60 seconds](#try-it-in-60-seconds)
 - [Sources](#sources)
-- [Quick Start](#quick-start)
-- [Operator's Guide](#operators-guide)
+- [Operate](#operate)
   - [Prerequisites](#prerequisites)
-  - [Configuration](#configuration)
-  - [Service Ports](#service-ports)
-  - [Deploying](#deploying)
-  - [Verifying the Deployment](#verifying-the-deployment)
-  - [Triggering DAGs](#triggering-dags)
-  - [Viewing Logs](#viewing-logs)
-  - [Troubleshooting](#troubleshooting)
-  - [Before Exposing Publicly](#before-exposing-publicly)
-- [Developer's Guide](#developers-guide)
-  - [Local Setup](#local-setup)
-  - [Make Targets](#make-targets)
-  - [Project Structure](#project-structure)
-  - [Running Tests](#running-tests)
-  - [CLI Command Reference](#cli-command-reference)
-  - [Adding a New Source](#adding-a-new-source)
-  - [Database Schema](#database-schema)
+  - [Configure](#configure)
+  - [Service ports](#service-ports)
+  - [Deploy](#deploy)
+  - [Verify](#verify)
+  - [Trigger DAGs](#trigger-dags)
+  - [Logs](#logs)
+  - [Troubleshoot](#troubleshoot)
+  - [Production hardening](#production-hardening)
+- [Develop](#develop)
+  - [Local setup](#local-setup)
+  - [Project structure](#project-structure)
+  - [Code map](#code-map)
+  - [Make targets](#make-targets)
+  - [Run tests](#run-tests)
+  - [Add a new source](#add-a-new-source)
+- [Reference](#reference)
+  - [Extract: 30-day cutoff and pagination](#extract-30-day-cutoff-and-pagination)
+  - [CLI reference](#cli-reference)
+  - [Database schema](#database-schema)
   - [Migrations](#migrations)
-- [DAG Schedules](#dag-schedules)
+  - [DAG schedules](#dag-schedules)
 - [License](#license)
 
-## Overview
+## What it does
 
-ETL pipeline for scraping, transforming, and loading Korean rental listings from community boards. Extracts HTML from six sources, parses and normalizes Korean text, geocodes addresses, deduplicates listings, and loads into PostgreSQL with full-text search. Orchestrated by Apache Airflow on a 6-hour schedule with audit logging and validation thresholds.
+- **Extracts** rental listings from six Korean-American community board scrapers using Scrapling's stealthy fetchers with Cloudflare bypass.
+- **Transforms** raw HTML into structured data: Korean text normalization, Nominatim geocoding, fuzzy + hash deduplication, trigram full-text search indexing.
+- **Loads** canonical listings into PostgreSQL 15 with PostGIS spatial queries and pg_trgm FTS, with upsert-based idempotency.
+- **Orchestrates** the pipeline via Apache Airflow on a 6-hour schedule with validation thresholds, audit logging, and email alerts.
 
-## Architecture
+## Architecture (at a glance)
 
 ```mermaid
 flowchart LR
@@ -49,30 +97,28 @@ flowchart LR
     L -.->|dag_id, run_id| AU
 ```
 
-**Extract**: Scrapling-based scrapers with Cloudflare bypass (StealthyFetcher, DynamicFetcher).  
-**Transform**: Korean text normalization, Nominatim geocoding, fuzzy + hash deduplication, trigram FTS indexing.  
-**Load**: PostgreSQL with PostGIS and pg_trgm extensions; upsert with audit trail.  
+**Extract**: Scrapling-based scrapers with Cloudflare bypass (StealthyFetcher, DynamicFetcher).
+**Transform**: Korean text normalization, Nominatim geocoding, fuzzy + hash deduplication, trigram FTS indexing.
+**Load**: PostgreSQL with PostGIS and pg_trgm extensions; upsert with audit trail.
 **Orchestration**: Apache Airflow LocalExecutor; 6-hour schedule with email alerts via MailHog (dev) or SMTP relay (prod).
 
-### Extract: 30-Day Cutoff and Pagination
+## Try it in 60 seconds
 
-The extract step implements a 30-day cutoff to avoid filling the warehouse with stale rentals. Each scraper:
+```bash
+git clone <repo-url>
+cd koreaRentalETL
+cp .env.example .env
+# Edit .env — set these three required keys:
+#   POSTGRES_PASSWORD
+#   AIRFLOW_DB_PASSWORD
+#   AIRFLOW_ADMIN_PASSWORD
 
-1. **Parses list-page dates** from each listing row (e.g., "05.19" for May 19, "16:53" for today's time-only format).
-2. **Paginates through list pages** using `?page=N` query parameters, walking pages until a row with `post_date < today - EXTRACT_CUTOFF_DAYS` is encountered.
-3. **Stops pagination early** when a stale row is found, saving bandwidth and API calls.
-4. **Filters at extract time** via `BaseScraper.extract()`, skipping detail-page fetches for stale listings.
+docker compose up -d --build
+```
 
-**Initial vs. steady-state behavior:**
-- **Initial run** (empty database): Backfills up to 30 days of history by walking all pages until cutoff.
-- **Steady-state run** (6-hour schedule): Pulls only new listings (typically page 1) because older URLs are cached in Redis (14-day TTL).
+**Success looks like:** the Airflow WebUI loads at `http://localhost:8080` (local dev), you can log in with `admin` / your `AIRFLOW_ADMIN_PASSWORD`, and the DAG list shows `korean_rental_full_etl`.
 
-**Deduplication layers** (unchanged):
-- Redis URL cache (14-day sliding TTL) skips re-fetching already-seen URLs.
-- `raw.scraped_pages` ON CONFLICT DO NOTHING on `(source_id, url, content_hash)` prevents duplicate HTML storage.
-- `staging.listings_staging` UNIQUE `(source_id, source_listing_id)` + UPSERT on `public.listings` ensures canonical dedup.
-
-Configure the cutoff window via `EXTRACT_CUTOFF_DAYS` (default 30 days).
+Other local-dev endpoints: MailHog inbox at `http://localhost:8025`, PostgreSQL at `localhost:5432`, Redis at `localhost:6379`.
 
 ## Sources
 
@@ -86,37 +132,36 @@ Configure the cutoff window via `EXTRACT_CUTOFF_DAYS` (default 30 days).
 | illinoisksa | https://illinoisksa.org/housing | Active |
 | hanintown | https://hanintown.com | Disabled |
 
-## Quick Start
+New listings within a 30-day window are extracted on each run; older URLs are skipped via Redis cache (14-day TTL). See [Extract: 30-day cutoff and pagination](#extract-30-day-cutoff-and-pagination) for details.
 
-```bash
-# Clone and configure
-git clone <repo-url>
-cd koreaRentalETL
-cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD, AIRFLOW_DB_PASSWORD, AIRFLOW_ADMIN_PASSWORD
-
-# Start the stack
-docker compose up -d --build
-
-# Access services
-# Airflow WebUI:  http://localhost:8080 (admin/admin by default)
-# MailHog:        http://localhost:8025
-# PostgreSQL:     localhost:5432
-# Redis:          localhost:6379
-```
-
-## Operator's Guide
+## Operate
 
 ### Prerequisites
 
 - Ubuntu 22.04 LTS or later
-- Docker Engine ≥ 24.0
+- Docker Engine >= 24.0
 - Docker Compose v2 plugin
-- Ports 8080, 5432, 5433, 6379, 1025, 8025 available
+- Ports 8080, 5432, 5433, 6379 available (local dev also uses 1025, 8025 for MailHog)
 
-### Configuration
+### Configure
 
-Copy `.env.example` to `.env` and edit the following keys:
+Copy `.env.example` to `.env` and set the required keys:
+
+| Key | Required | Default | Description |
+|-----|----------|---------|-------------|
+| `POSTGRES_PASSWORD` | Yes | *None* | PostgreSQL app DB password |
+| `AIRFLOW_DB_PASSWORD` | Yes | *None* | Airflow metadata DB password |
+| `AIRFLOW_ADMIN_PASSWORD` | Yes | *None* | Airflow WebUI admin password |
+| `AIRFLOW_HOST` | Yes | `localhost` | Hostname routing the Airflow WebUI (Coolify/Traefik) |
+| `AIRFLOW__SMTP__SMTP_HOST` | Yes | `smtp.resend.com` | SMTP relay host |
+| `AIRFLOW__SMTP__SMTP_PASSWORD` | Yes | *None* | SMTP password / Resend API key |
+| `AIRFLOW__SMTP__SMTP_MAIL_FROM` | Yes | *None* | SMTP sender email |
+| `SMTP_TO` | Yes | `admin@example.com` | Email recipient for Airflow alerts |
+
+Missing required keys cause an immediate `RuntimeError` on startup.
+
+<details>
+<summary>Show full environment variables</summary>
 
 | Key | Required | Default | Description |
 |-----|----------|---------|-------------|
@@ -143,11 +188,11 @@ Copy `.env.example` to `.env` and edit the following keys:
 | `AIRFLOW__SMTP__SMTP_MAIL_FROM` | Yes | *None* | SMTP sender email |
 | `SMTP_TO` | Yes | `admin@example.com` | Email recipient for Airflow alerts |
 
-### Service Ports
+</details>
 
-For production hardening, all services are network isolated within the Docker bridge network. No ports are exposed publicly to the host interface.
+### Service ports
 
-For local development, `docker-compose.override.yml` is used to expose ports securely and bind them exclusively to `127.0.0.1`:
+The base `docker-compose.yml` network-isolates all services. For local development, `docker-compose.override.yml` binds ports to `127.0.0.1`:
 
 | Service | Port | Binding | Purpose |
 |---------|------|---------|---------|
@@ -155,25 +200,20 @@ For local development, `docker-compose.override.yml` is used to expose ports sec
 | PostgreSQL (app) | 5432 | `127.0.0.1:5432` | Korean rental listings database |
 | PostgreSQL (Airflow) | 5433 | `127.0.0.1:5433` | Airflow metadata database |
 | Redis | 6379 | `127.0.0.1:6379` | Deduplication cache |
-| MailHog SMTP | 1025 | `127.0.0.1:1025` | Email relay (dev only, under `dev` profile) |
-| MailHog WebUI | 8025 | `127.0.0.1:8025` | Email inbox viewer (dev only, under `dev` profile) |
+| MailHog SMTP | 1025 | `127.0.0.1:1025` | Email relay (dev only, `dev` profile) |
+| MailHog WebUI | 8025 | `127.0.0.1:8025` | Email inbox viewer (dev only, `dev` profile) |
 
-### Deploying
+### Deploy
 
 ```bash
-# Build and start all services
 docker compose up -d --build
-
-# Verify services are running
 docker compose ps
-
-# Check service health
-docker compose ps --filter "health=healthy"
 ```
 
 The `airflow-init` service runs migrations and creates the admin user automatically. Wait ~30 seconds for all services to become healthy.
 
-### Coolify Deployment
+<details>
+<summary>Coolify (production) deployment</summary>
 
 When deploying to a production host managed by **Coolify**:
 
@@ -187,28 +227,25 @@ When deploying to a production host managed by **Coolify**:
 3. **Fail-Fast behavior**: If any of the required passwords above are missing or empty, database configuration will raise a `RuntimeError` immediately upon start.
 4. **Postgres Backups & Disaster Recovery**: Production database backups are managed automatically by Coolify. See the comprehensive [backups.md](docs/backups.md) for automated scheduling, offsite copy setups, manual recovery tools, and restore drill instructions.
 
-### Verifying the Deployment
+The production `docker-compose.yml` binds the Airflow WebUI to the host's Tailscale interface (e.g. `http://<tailscale-host>:18080`). Traefik labels are preconfigured for automatic Let's Encrypt TLS via the domain set in `AIRFLOW_HOST`.
+
+</details>
+
+### Verify
 
 ```bash
-# Run the smoke test
 make verify-deploy
 ```
 
-This target:
-1. Brings down and removes volumes (fresh start)
-2. Builds and starts the full stack
-3. Waits for services to become healthy
-4. Verifies the `korean-rental-etl` package is installed in the Airflow container
-5. Verifies the CLI is on PATH inside the container
-6. Verifies all DAGs import without errors
+This target: brings down volumes (fresh start), builds and starts the full stack, waits for services to become healthy, verifies the `korean-rental-etl` package and CLI are installed in the Airflow container, and confirms all DAGs import without errors.
 
-### Triggering DAGs
+### Trigger DAGs
 
 **Via Airflow WebUI:**
-1. Open http://localhost:8080
-2. Log in with admin / `AIRFLOW_ADMIN_PASSWORD`
-3. Find `korean_rental_full_etl` or `korean_rental_cleanup` in the DAG list
-4. Click the DAG name, then click the play icon to trigger
+1. Open `http://localhost:8080` (local dev) or `https://<AIRFLOW_HOST>` (production).
+2. Log in with `admin` / your `AIRFLOW_ADMIN_PASSWORD`.
+3. Find `korean_rental_full_etl` or `korean_rental_cleanup` in the DAG list.
+4. Click the DAG name, then click the play icon to trigger.
 
 **Via CLI:**
 ```bash
@@ -222,35 +259,37 @@ docker compose exec airflow-scheduler korean-rental-etl load
 docker compose exec airflow-scheduler korean-rental-etl validate --run-id <run-id>
 ```
 
-### Viewing Logs
+### Logs
 
-**Airflow task logs:**
 ```bash
-# Stream logs from the scheduler
+# Stream scheduler logs
 docker compose logs -f airflow-scheduler
 
-# Stream logs from the webserver
+# Stream webserver logs
 docker compose logs -f airflow-webserver
 
-# View task logs in the WebUI: DAG → Task Instance → Logs tab
+# View task logs in the WebUI: DAG > Task Instance > Logs tab
+
+# Access task log files directly
+docker compose exec airflow-scheduler tail -f /opt/airflow/logs/<dag_id>/<task_id>/<run_id>/attempt-1.log
 ```
 
-**Application logs:**
-```bash
-# Logs are written to the airflow_logs named volume
-# Access via: docker compose exec airflow-scheduler tail -f /opt/airflow/logs/<dag_id>/<task_id>/<run_id>/attempt-1.log
-```
+### Troubleshoot
 
-### Troubleshooting
+<details>
+<summary>Port already in use</summary>
 
-**Port already in use:**
 ```bash
 # Find which process is using the port (e.g., 8080)
 lsof -i :8080
 # Kill it or change the port in docker-compose.yml
 ```
 
-**airflow-init fails or hangs:**
+</details>
+
+<details>
+<summary>airflow-init fails or hangs</summary>
+
 ```bash
 # Check the init logs
 docker compose logs airflow-init
@@ -262,7 +301,11 @@ docker compose restart airflow-init
 docker compose exec airflow_postgres pg_isready -U airflow
 ```
 
-**DAG import errors:**
+</details>
+
+<details>
+<summary>DAG import errors</summary>
+
 ```bash
 # Check for syntax errors in DAG files
 docker compose exec airflow-scheduler python -m py_compile /opt/airflow/dags/*.py
@@ -271,7 +314,11 @@ docker compose exec airflow-scheduler python -m py_compile /opt/airflow/dags/*.p
 docker compose exec airflow-scheduler python -c "from airflow.models import DagBag; db = DagBag(include_examples=False); print(db.import_errors)"
 ```
 
-**PostgreSQL healthcheck failing:**
+</details>
+
+<details>
+<summary>PostgreSQL healthcheck failing</summary>
+
 ```bash
 # Verify the password is correct in .env
 docker compose exec postgres psql -U etl_user -d korean_rental -c "SELECT 1"
@@ -280,7 +327,11 @@ docker compose exec postgres psql -U etl_user -d korean_rental -c "SELECT 1"
 docker compose logs postgres
 ```
 
-**Redis connection refused:**
+</details>
+
+<details>
+<summary>Redis connection refused</summary>
+
 ```bash
 # Verify Redis is running
 docker compose exec redis redis-cli ping
@@ -289,9 +340,12 @@ docker compose exec redis redis-cli ping
 docker compose logs redis
 ```
 
-### Production Hardening Posture
+</details>
 
-This pipeline is fully hardened for production environments:
+### Production hardening
+
+<details>
+<summary>Security and hardening details</summary>
 
 - **Network Isolation**: By default, `docker-compose.yml` does not expose any ports to the host interface. All inter-service communication happens securely inside the private Docker network.
 - **Local Dev Binding**: Local development uses `docker-compose.override.yml` to safely bind ports to `127.0.0.1`.
@@ -299,9 +353,11 @@ This pipeline is fully hardened for production environments:
 - **Coolify Integration**: Traefik labels are preconfigured for the `airflow-webserver` to allow Coolify to automatically provision Let's Encrypt TLS certificates and manage secure routing via the domain specified in `AIRFLOW_HOST`.
 - **Resend SMTP**: Production notification utilizes Resend SMTP over TLS/StartTLS, ensuring robust delivery of success/failure alerts.
 
-## Developer's Guide
+</details>
 
-### Local Setup
+## Develop
+
+### Local setup
 
 ```bash
 # Install dependencies with dev and test extras
@@ -311,26 +367,25 @@ make dev
 uv sync --extra dev --extra test
 ```
 
-### Make Targets
+### Project structure
 
-| Target | Purpose |
-|--------|---------|
-| `make help` | Show all available targets |
-| `make install` | Install project dependencies |
-| `make dev` | Install with dev and test extras |
-| `make lint` | Run ruff linter and formatter check |
-| `make format` | Auto-format code with ruff |
-| `make typecheck` | Run mypy type checker |
-| `make test` | Run unit tests with coverage (80% gate on transform module) |
-| `make test-integration` | Run integration tests (requires Docker Compose) |
-| `make ci` | Run full CI pipeline (lint + typecheck + test) |
-| `make smoke` | Run smoke tests (DAG imports + CLI version) |
-| `make verify-deploy` | Verify production-ready containerized deployment |
-| `make backup` | Create a timestamped Postgres custom-format dump under `backups/` |
-| `make restore` | Restore from a backup: `make restore BACKUP_FILE=backups/<file>.dump` |
-| `make clean` | Clean build artifacts and caches |
+The codebase is organized into layers that mirror the ETL stages:
 
-### Project Structure
+| Layer | Path | Purpose |
+|-------|------|---------|
+| Extract | `src/korean_rental_etl/extract/` | Scrapers, fetcher selection, raw HTML storage |
+| Transform | `src/korean_rental_etl/transform/` | Parsers, normalizers, dedup, staging writer |
+| Load | `src/korean_rental_etl/load/` | Upsert, cleanup, audit trail |
+| Validation | `src/korean_rental_etl/validation/` | Threshold checks and rules |
+| Orchestration | `airflow/dags/` | DAG definitions (full_etl, cleanup) |
+| Database | `sql/migrations/` | Schema DDL, seed data, index fixes |
+| CLI | `src/korean_rental_etl/cli/` | Click-based command interface |
+| Infrastructure | `Dockerfile.*`, `docker-compose*.yml` | Container and compose definitions |
+| Configuration | `config/` | Source registry (sources.yml) |
+| Tests | `tests/` | Unit and integration tests |
+
+<details>
+<summary>Show full file tree</summary>
 
 ```
 src/korean_rental_etl/
@@ -389,40 +444,60 @@ sql/
     └── 003_add_illinoisksa.sql # Add illinoisksa.org/housing source
 ```
 
-### Running Tests
+</details>
 
-**Unit tests (fast, no Docker required):**
+### Code map
+
+This repo ships a machine-generated index of every file, class, function, table, and service at [`.understand-anything/knowledge-graph.json`](.understand-anything/knowledge-graph.json). It groups the codebase into 12 layers (Extract, Transform, Load, Validation, Orchestration, Database, CLI, Infrastructure, Configuration, Documentation, Tests, Scripts) and includes a 12-step contributor tour. Open it with `jq` or any JSON viewer — useful before adding a new source, parser, or DAG.
+
+### Make targets
+
+| Target | Purpose |
+|--------|---------|
+| `make dev` | Install with dev and test extras |
+| `make lint` | Run ruff linter and formatter check |
+| `make test` | Run unit tests with coverage (80% gate on transform module) |
+| `make ci` | Run full CI pipeline (lint + typecheck + test) |
+| `make verify-deploy` | Verify production-ready containerized deployment |
+
+<details>
+<summary>Show all make targets</summary>
+
+| Target | Purpose |
+|--------|---------|
+| `make help` | Show all available targets |
+| `make install` | Install project dependencies |
+| `make dev` | Install with dev and test extras |
+| `make lint` | Run ruff linter and formatter check |
+| `make format` | Auto-format code with ruff |
+| `make typecheck` | Run mypy type checker |
+| `make test` | Run unit tests with coverage (80% gate on transform module) |
+| `make test-integration` | Run integration tests (requires Docker Compose) |
+| `make ci` | Run full CI pipeline (lint + typecheck + test) |
+| `make smoke` | Run smoke tests (DAG imports + CLI version) |
+| `make verify-deploy` | Verify production-ready containerized deployment |
+| `make backup` | Create a timestamped Postgres custom-format dump under `backups/` |
+| `make restore` | Restore from a backup: `make restore BACKUP_FILE=backups/<file>.dump` |
+| `make clean` | Clean build artifacts and caches |
+
+</details>
+
+### Run tests
+
 ```bash
+# Unit tests (fast, no Docker required)
 make test
-```
 
-**Integration tests (requires Docker Compose):**
-```bash
+# Integration tests (requires Docker Compose)
 make test-integration
-```
 
-**Full CI (lint + typecheck + unit tests):**
-```bash
+# Full CI (lint + typecheck + unit tests)
 make ci
 ```
 
-Note: The coverage gate requires 80% coverage on the `transform` module. Pre-existing mypy errors in `transform/` and `extract/` are known and out of scope for this release.
+The coverage gate requires 80% coverage on the `transform` module. Pre-existing mypy errors in `transform/` and `extract/` are known and out of scope for this release.
 
-### CLI Command Reference
-
-| Command | Flags | Purpose |
-|---------|-------|---------|
-| `korean-rental-etl sources list` | — | List all configured sources |
-| `korean-rental-etl sources show <name>` | — | Show details for a source |
-| `korean-rental-etl extract` | `--source <name>` or `--all`, `--dag-id`, `--run-id` | Extract listings from sources |
-| `korean-rental-etl transform` | `--source <name>` or `--all`, `--limit N`, `--dag-id`, `--run-id` | Transform extracted listings |
-| `korean-rental-etl load` | `--source <name>`, `--dag-id`, `--run-id` | Load transformed listings |
-| `korean-rental-etl validate` | `--run-id <id>` | Validate loaded listings |
-| `korean-rental-etl run-all` | `--dag-id`, `--run-id` | Run full pipeline (extract → transform → load → validate) |
-| `korean-rental-etl cleanup mark-stale` | `--days N` | Mark listings inactive if not seen in N days |
-| `korean-rental-etl cleanup purge-pages` | `--days N` | Delete raw HTML pages older than N days |
-
-### Adding a New Source
+### Add a new source
 
 1. **Add source to `config/sources.yml`:**
    ```yaml
@@ -437,12 +512,12 @@ Note: The coverage gate requires 80% coverage on the `transform` module. Pre-exi
 2. **Create scraper in `src/korean_rental_etl/extract/scrapers/newsource.py`:**
    ```python
    from korean_rental_etl.extract.base_scraper import BaseScraper
-   
+
    class NewSourceScraper(BaseScraper):
        def crawl_list_pages(self):
            # Yield (url, html_content) tuples
            pass
-       
+
        def fetch_detail(self, url):
            # Return detail page HTML
            pass
@@ -451,7 +526,7 @@ Note: The coverage gate requires 80% coverage on the `transform` module. Pre-exi
 3. **Create parser in `src/korean_rental_etl/transform/parsers/newsource.py`:**
    ```python
    from korean_rental_etl.transform.parsers.base_parser import BaseParser
-   
+
    class NewSourceParser(BaseParser):
        def parse(self, html):
            # Return dict with keys: title_ko, body_ko, raw_price, raw_location, etc.
@@ -472,16 +547,70 @@ Note: The coverage gate requires 80% coverage on the `transform` module. Pre-exi
 
 6. **Write tests in `tests/unit/extract/test_newsource_scraper.py` and `tests/unit/transform/test_newsource_parser.py`.**
 
-### Database Schema
+## Reference
 
-The database uses four schemas that mirror the ETL stages:
+### Extract: 30-day cutoff and pagination
 
-```
-public  → catalog tables (sources, listings)
-raw     → scraped HTML before parsing (scraped_pages)
-staging → parsed but not-yet-loaded rows (listings_staging)
-audit   → run-level execution logs (etl_runs)
-```
+<details>
+<summary>Show extract cutoff details</summary>
+
+The extract step implements a 30-day cutoff to avoid filling the warehouse with stale rentals. Each scraper:
+
+1. **Parses list-page dates** from each listing row (e.g., "05.19" for May 19, "16:53" for today's time-only format).
+2. **Paginates through list pages** using `?page=N` query parameters, walking pages until a row with `post_date < today - EXTRACT_CUTOFF_DAYS` is encountered.
+3. **Stops pagination early** when a stale row is found, saving bandwidth and API calls.
+4. **Filters at extract time** via `BaseScraper.extract()`, skipping detail-page fetches for stale listings.
+
+**Initial vs. steady-state behavior:**
+- **Initial run** (empty database): Backfills up to 30 days of history by walking all pages until cutoff.
+- **Steady-state run** (6-hour schedule): Pulls only new listings (typically page 1) because older URLs are cached in Redis (14-day TTL).
+
+**Deduplication layers** (unchanged):
+- Redis URL cache (14-day sliding TTL) skips re-fetching already-seen URLs.
+- `raw.scraped_pages` ON CONFLICT DO NOTHING on `(source_id, url, content_hash)` prevents duplicate HTML storage.
+- `staging.listings_staging` UNIQUE `(source_id, source_listing_id)` + UPSERT on `public.listings` ensures canonical dedup.
+
+Configure the cutoff window via `EXTRACT_CUTOFF_DAYS` (default 30 days).
+
+</details>
+
+### CLI reference
+
+<details>
+<summary>Show CLI commands</summary>
+
+| Command | Flags | Purpose |
+|---------|-------|---------|
+| `korean-rental-etl sources list` | — | List all configured sources |
+| `korean-rental-etl sources show <name>` | — | Show details for a source |
+| `korean-rental-etl extract` | `--source <name>` or `--all`, `--dag-id`, `--run-id` | Extract listings from sources |
+| `korean-rental-etl transform` | `--source <name>` or `--all`, `--limit N`, `--dag-id`, `--run-id` | Transform extracted listings |
+| `korean-rental-etl load` | `--source <name>`, `--dag-id`, `--run-id` | Load transformed listings |
+| `korean-rental-etl validate` | `--run-id <id>` | Validate loaded listings |
+| `korean-rental-etl run-all` | `--dag-id`, `--run-id` | Run full pipeline (extract -> transform -> load -> validate) |
+| `korean-rental-etl cleanup mark-stale` | `--days N` | Mark listings inactive if not seen in N days |
+| `korean-rental-etl cleanup purge-pages` | `--days N` | Delete raw HTML pages older than N days |
+
+</details>
+
+### Database schema
+
+Four schemas mirror the ETL stages: `public` (catalog: sources, listings), `raw` (scraped HTML), `staging` (parsed rows pending load), `audit` (run-level execution logs).
+
+**Tables at a glance:**
+
+| Schema | Table | Role | Unique key |
+|--------|-------|------|------------|
+| `public` | `sources` | Source registry | `name` |
+| `raw` | `scraped_pages` | Raw HTML history | `(source_id, url, content_hash)` |
+| `staging` | `listings_staging` | Parsed rows pending load | `(source_id, source_listing_id)` |
+| `public` | `listings` | Canonical clean listings | `(source_id, source_listing_id)` |
+| `audit` | `etl_runs` | Per-task execution audit | `id` (looked up via `run_id`) |
+
+**PostgreSQL extensions:** `postgis` (for `GEOMETRY` and GiST), `pg_trgm` (for trigram FTS).
+
+<details>
+<summary>Show ERD, data flow, and indexes</summary>
 
 **Entity-relationship diagram:**
 
@@ -580,16 +709,6 @@ erDiagram
     listings_staging }o..o| listings       : "upserted to (canonical_id)"
 ```
 
-**Tables at a glance:**
-
-| Schema | Table | Role | Unique key |
-|--------|-------|------|------------|
-| `public` | `sources` | Source registry | `name` |
-| `raw` | `scraped_pages` | Raw HTML history | `(source_id, url, content_hash)` |
-| `staging` | `listings_staging` | Parsed rows pending load | `(source_id, source_listing_id)` |
-| `public` | `listings` | Canonical clean listings | `(source_id, source_listing_id)` |
-| `audit` | `etl_runs` | Per-task execution audit | `id` (looked up via `run_id`) |
-
 **Data flow through the tables:**
 
 1. **Extract** writes one row per fetched page into `raw.scraped_pages` (hashes prevent re-storing identical HTML).
@@ -607,11 +726,11 @@ erDiagram
 | `idx_listings_source_id` / `_city` / `_category` / `_is_active` / `_posted_at` / `_last_seen` | B-tree on each | Common filter columns |
 | `idx_scraped_pages_source_url` | B-tree `(source_id, url)` | Lookup by source + URL |
 | `idx_staging_source_listing` | UNIQUE B-tree `(source_id, source_listing_id)` | Upsert lookup |
-| `idx_etl_runs_run_id` | B-tree `(run_id)` | Resolve Airflow `run_id` → numeric audit id |
-
-**PostgreSQL extensions:** `postgis` (for `GEOMETRY` and GiST), `pg_trgm` (for trigram FTS).
+| `idx_etl_runs_run_id` | B-tree `(run_id)` | Resolve Airflow `run_id` -> numeric audit id |
 
 The full schema definitions live in [`sql/migrations/001_initial_schema.sql`](sql/migrations/001_initial_schema.sql) and [`sql/migrations/002_fix_fts_index.sql`](sql/migrations/002_fix_fts_index.sql).
+
+</details>
 
 ### Migrations
 
@@ -627,12 +746,12 @@ For existing databases, manually run the migration:
 docker compose exec postgres psql -U etl_user -d korean_rental -f /docker-entrypoint-initdb.d/NNN_description.sql
 ```
 
-## DAG Schedules
+### DAG schedules
 
 | DAG | Schedule | Tasks |
 |-----|----------|-------|
-| `korean_rental_full_etl` | Every 6 hours (0 */6 * * *) | health_check → extract → transform → load → validate → notify |
-| `korean_rental_cleanup` | Daily at 03:00 UTC (0 3 * * *) | mark_stale_listings_inactive → purge_old_raw_pages |
+| `korean_rental_full_etl` | Every 6 hours (0 */6 * * *) | health_check -> extract -> transform -> load -> validate -> notify |
+| `korean_rental_cleanup` | Daily at 03:00 UTC (0 3 * * *) | mark_stale_listings_inactive -> purge_old_raw_pages |
 
 ## License
 
