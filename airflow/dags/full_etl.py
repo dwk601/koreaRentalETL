@@ -20,7 +20,8 @@ default_args = {
     "email": [os.environ.get("SMTP_TO", "admin@example.com")],
     "email_on_failure": True,
     "email_on_retry": False,
-    "retries": 3,
+    "retries": 1,
+    "execution_timeout": timedelta(hours=4),
     "retry_delay": timedelta(minutes=5),
     "retry_exponential_backoff": True,
 }
@@ -32,6 +33,8 @@ with DAG(
     schedule="0 */6 * * *",  # Every 6 hours
     start_date=datetime(2024, 1, 1, tzinfo=UTC),
     catchup=False,
+    max_active_runs=1,
+    dagrun_timeout=timedelta(hours=5),
     tags=["korean-rental", "etl"],
 ) as dag:
     health_check = BashOperator(
