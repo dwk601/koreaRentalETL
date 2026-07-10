@@ -6,9 +6,6 @@ FROM postgis/postgis:16-3.4
 # would be empty at runtime).
 #
 # Postgres' default entrypoint executes /docker-entrypoint-initdb.d/*.sql
-# in lexical order on first init of an empty data volume. For an existing
-# (non-empty) volume, the migrations must be applied manually:
-#
-#   docker exec <postgres-container> bash -c 'for f in /docker-entrypoint-initdb.d/*.sql; do \
-#     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$f"; done'
+# on a new data volume. The Compose app-migrate service applies and records
+# migrations for existing volumes before Airflow initialization.
 COPY sql/migrations/ /docker-entrypoint-initdb.d/

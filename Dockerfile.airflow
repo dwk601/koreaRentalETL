@@ -5,7 +5,7 @@ USER root
 # System dependencies:
 #   - build-essential, libpq-dev: building psycopg / installing native deps
 #   - lib*: runtime libs Chromium needs (used by Patchright/Playwright for the
-#     stealth fetcher in missyusa and radiokorea scrapers).
+#     stealth fetcher in missyusa).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -41,8 +41,8 @@ COPY --chown=airflow:root src/ ./src/
 # Install the package locally using pip to put the cli executable on PATH
 RUN pip install --no-cache-dir .
 
-# Install Chromium browser binaries for Patchright (used by missyusa and
-# radiokorea via StealthyFetcher). This downloads ~150MB to
+# Install Chromium browser binaries for Patchright (used by missyusa via
+# StealthyFetcher). This downloads ~150MB to
 # /home/airflow/.cache/ms-playwright. Without this step those scrapers fail
 # at runtime with "Executable doesn't exist at chromium-XXXX/chrome-linux64".
 RUN patchright install chromium
