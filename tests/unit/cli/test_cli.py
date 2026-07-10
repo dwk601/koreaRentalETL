@@ -33,6 +33,25 @@ class TestSourcesCommands:
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
 
+    def test_sources_check_passes_when_registries_align(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("korean_rental_etl.cli.cli.source_registry_errors", lambda: [])
+        result = runner.invoke(main, ["sources", "check"])
+        assert result.exit_code == 0
+        assert "aligned" in result.output.lower()
+
+    def test_sources_check_fails_with_concise_errors(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "korean_rental_etl.cli.cli.source_registry_errors",
+            lambda: ["missing from database: illinoisksa"],
+        )
+        result = runner.invoke(main, ["sources", "check"])
+        assert result.exit_code == 1
+        assert "missing from database: illinoisksa" in result.output
+
 
 class TestExtractCommand:
     @pytest.fixture
@@ -48,3 +67,15 @@ class TestExtractCommand:
         result = runner.invoke(main, ["extract", "--source", "nonexistent"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
+
+    def test_extract_all_stops_before_scraping_when_preflight_fails(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "korean_rental_etl.cli.cli.source_registry_errors",
+            lambda: ["missing from database: illinoisksa"],
+        )
+        result = runner.invoke(main, ["extract", "--all"])
+        assert result.exit_code == 1
+        assert "preflight failed" in result.output.lower()
+        assert "missing from database: illinoisksa" in result.output

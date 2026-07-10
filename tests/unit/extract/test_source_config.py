@@ -10,6 +10,7 @@ from korean_rental_etl.extract.source_config import (
     active_sources,
     get_source,
     load_sources,
+    registry_errors,
 )
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
@@ -128,3 +129,31 @@ sources:
         assert config.sources[0].fetcher == "StealthyFetcher"
         assert config.sources[0].schedule == "0 */6 * * *"
         assert config.sources[0].description == "SV Korean community"
+
+
+class TestRegistryErrors:
+    def test_reports_missing_database_source(self) -> None:
+        errors = registry_errors(
+            configured_active={"svkoreans", "illinoisksa"},
+            scraper_names={"svkoreans", "illinoisksa"},
+            parser_names={"svkoreans", "illinoisksa"},
+            database_active={"svkoreans"},
+        )
+        assert errors == ["missing from database: illinoisksa"]
+
+    def test_reports_all_mismatches(self) -> None:
+        errors = registry_errors(
+            configured_active={"configured"},
+            scraper_names={"scraper-only"},
+            parser_names={"parser-only"},
+            database_active={"database-only"},
+        )
+        assert errors == [
+            "missing scraper: configured",
+            "missing parser: configured",
+            "missing from database: configured",
+            "active only in database: database-only",
+        ]
+
+    def test_accepts_aligned_registries(self) -> None:
+        assert registry_errors({"source"}, {"source"}, {"source"}, {"source"}) == []

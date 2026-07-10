@@ -26,23 +26,19 @@ def _canonicalize_detail_url(url: str) -> str:
 class RadiokoreaScraper(BaseScraper):
     """Scraper for radiokorea.com bulletin board (c_realestate / c_realty_rent).
 
-    radiokorea.com sits behind Cloudflare; we use StealthyFetcher with
-    ``solve_cloudflare=True`` to clear the Turnstile challenge before parsing.
-    The list page renders rentals as ``ul.board_list > li > a.thumb`` rows;
-    notice rows carry an explicit ``li.notice`` class which we exclude.
+    radiokorea.com currently serves its public list and detail pages over plain
+    HTTP requests from the production host. Use the lightweight Fetcher to avoid
+    launching a Chromium process for every request; ban detection still catches
+    any future 403/429 or challenge response.
     """
 
     source_name = "radiokorea"
-    fetcher_type = "StealthyFetcher"
+    fetcher_type = "Fetcher"
     _list_url = "https://radiokorea.com/bulletin/bbs/board.php?bo_table=c_realestate"
     max_pages = 3  # Lower cap due to Cloudflare solve cost per page
 
-    # StealthyFetcher kwargs needed to bypass Cloudflare on radiokorea.com
-    _fetch_kwargs: dict[str, Any] = {
-        "solve_cloudflare": True,
-        "network_idle": True,
-        "headless": True,
-    }
+    # No browser/solver options: static requests are substantially cheaper.
+    _fetch_kwargs: dict[str, Any] = {}
 
     def crawl_list_pages(self) -> Iterator[dict[str, Any]]:
         for page_url in self._paginated_list_urls():

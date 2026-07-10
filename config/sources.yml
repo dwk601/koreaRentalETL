@@ -45,7 +45,7 @@ sources:
   - name: radiokorea
     url: "https://radiokorea.com"
     path: "bulletin/bbs/board.php?bo_table=c_realestate"
-    fetcher: StealthyFetcher
+    fetcher: Fetcher
     schedule: "0 */6 * * *"
     download_delay_sec: 2.0
     concurrent_requests: 1

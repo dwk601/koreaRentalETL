@@ -55,6 +55,39 @@ services:
     profiles:
       - dev
 
+  app-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-korean_rental}
+      POSTGRES_USER: ${POSTGRES_USER:-etl_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        psql -v ON_ERROR_STOP=1 -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" <<'SQL'
+        CREATE TABLE IF NOT EXISTS public.schema_migrations (
+          filename text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        );
+        SQL
+        for migration in /docker-entrypoint-initdb.d/*.sql; do
+          filename="$${migration##*/}"
+          applied="$$(psql -v ON_ERROR_STOP=1 -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc "SELECT 1 FROM public.schema_migrations WHERE filename = '$$filename'")"
+          if [ "$$applied" = 1 ]; then
+            echo "Skipping $$filename (already applied)"
+            continue
+          fi
+          echo "Applying $$filename"
+          psql -v ON_ERROR_STOP=1 -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -f "$$migration"
+          psql -v ON_ERROR_STOP=1 -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "INSERT INTO public.schema_migrations(filename) VALUES ('$$filename')"
+        done
+
   airflow-init:
     build:
       context: .
@@ -62,6 +95,8 @@ services:
     container_name: korean_rental_airflow_init
     restart: "no"
     depends_on:
+      app-migrate:
+        condition: service_completed_successfully
       airflow_postgres:
         condition: service_healthy
       postgres:

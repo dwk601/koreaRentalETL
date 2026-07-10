@@ -12,12 +12,14 @@ from datetime import UTC, datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
+smtp_to = os.environ.get("SMTP_TO")
+
 # Default args
 default_args = {
     "owner": "korean-rental-etl",
     "depends_on_past": False,
-    "email": [os.environ.get("SMTP_TO", "admin@example.com")],
-    "email_on_failure": True,
+    "email": [smtp_to] if smtp_to else [],
+    "email_on_failure": bool(smtp_to),
     "email_on_retry": False,
     "retries": 2,
     "retry_delay": timedelta(minutes=5),

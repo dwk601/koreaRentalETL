@@ -1,7 +1,7 @@
 """Korean Rental ETL - Full ETL DAG.
 
 Schedule: Every 6 hours.
-Tasks: health_check -> extract -> transform -> load -> validate -> notify
+Tasks: health_check -> source_preflight -> extract -> transform -> load -> validate [-> notify]
 """
 
 from __future__ import annotations
@@ -13,12 +13,13 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.providers.smtp.operators.smtp import EmailOperator
 
-# Default args with conservative retry
+smtp_to = os.environ.get("SMTP_TO")
+
 default_args = {
     "owner": "korean-rental-etl",
     "depends_on_past": False,
-    "email": [os.environ.get("SMTP_TO", "admin@example.com")],
-    "email_on_failure": True,
+    "email": [smtp_to] if smtp_to else [],
+    "email_on_failure": bool(smtp_to),
     "email_on_retry": False,
     "retries": 1,
     "execution_timeout": timedelta(hours=4),
@@ -30,7 +31,7 @@ with DAG(
     dag_id="korean_rental_full_etl",
     default_args=default_args,
     description="Full ETL pipeline for Korean rental listings",
-    schedule="0 */6 * * *",  # Every 6 hours
+    schedule="0 */6 * * *",
     start_date=datetime(2024, 1, 1, tzinfo=UTC),
     catchup=False,
     max_active_runs=1,
@@ -40,6 +41,11 @@ with DAG(
     health_check = BashOperator(
         task_id="health_check",
         bash_command="echo 'Health check passed'",
+    )
+
+    source_preflight = BashOperator(
+        task_id="source_preflight",
+        bash_command="korean-rental-etl sources check",
     )
 
     extract = BashOperator(
@@ -62,12 +68,13 @@ with DAG(
         bash_command='korean-rental-etl validate --run-id "{{ run_id }}"',
     )
 
-    notify = EmailOperator(
-        task_id="notify",
-        to=os.environ.get("SMTP_TO", "admin@example.com"),
-        subject="Korean Rental ETL - Run Completed",
-        html_content="<p>ETL run completed successfully at {{ execution_date }}</p>",
-    )
+    health_check >> source_preflight >> extract >> transform >> load >> validate
 
-    # Task dependencies
-    health_check >> extract >> transform >> load >> validate >> notify
+    if smtp_to:
+        notify = EmailOperator(
+            task_id="notify",
+            to=smtp_to,
+            subject="Korean Rental ETL - Run Completed",
+            html_content="<p>ETL run completed successfully at {{ execution_date }}</p>",
+        )
+        validate >> notify

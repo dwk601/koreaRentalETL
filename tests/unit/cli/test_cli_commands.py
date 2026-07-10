@@ -30,6 +30,7 @@ class TestCliCommands:
 
             assert result.exit_code == 0
             assert "Extracted 10 listings" in result.output
+            assert "elapsed_seconds=" in result.output
             mock_get_id.assert_called_once_with("svkoreans")
             mock_scraper.extract.assert_called_once_with(dag_id="dag123", run_id="run123")
 

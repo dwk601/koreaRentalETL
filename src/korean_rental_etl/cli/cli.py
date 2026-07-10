@@ -1,8 +1,33 @@
 """Korean Rental ETL - Command Line Interface."""
 
+import time
+
 import click
 
 from korean_rental_etl import __version__
+
+
+def source_registry_errors() -> list[str]:
+    """Compare active YAML sources with scraper, parser, and database registries."""
+    from korean_rental_etl.db.connection import get_cursor
+    from korean_rental_etl.extract.scraper_factory import ScraperFactory
+    from korean_rental_etl.extract.source_config import (
+        active_sources,
+        load_sources,
+        registry_errors,
+    )
+    from korean_rental_etl.transform.pipeline import _get_parser
+
+    configured = {source.name for source in active_sources(load_sources())}
+    with get_cursor() as cur:
+        cur.execute("SELECT name FROM public.sources WHERE is_active = TRUE")
+        database = {str(row["name"]) for row in cur.fetchall()}
+    return registry_errors(
+        configured,
+        set(ScraperFactory.available_sources()),
+        {name for name in configured if _get_parser(name) is not None},
+        database,
+    )
 
 
 @click.group()
@@ -51,6 +76,17 @@ def sources_show(name: str) -> None:
     click.echo(f"Description: {s.description}")
 
 
+@sources.command("check")
+def sources_check() -> None:
+    """Verify YAML, code, and database source registries are aligned."""
+    errors = source_registry_errors()
+    if errors:
+        for error in errors:
+            click.echo(f"  ✗ {error}", err=True)
+        raise SystemExit(1)
+    click.echo("✓ Source registries aligned")
+
+
 @main.command()
 @click.option("--source", help="Source name to extract from")
 @click.option("--all", "extract_all", is_flag=True, help="Extract from all active sources")
@@ -68,6 +104,14 @@ def extract(source: str | None, extract_all: bool, dag_id: str | None, run_id: s
         click.echo("Error: Please specify --source or --all", err=True)
         raise SystemExit(1)
 
+    if extract_all:
+        errors = source_registry_errors()
+        if errors:
+            click.echo("Source preflight failed:", err=True)
+            for error in errors:
+                click.echo(f"  ✗ {error}", err=True)
+            raise SystemExit(1)
+
     sources_to_extract = []
     if extract_all:
         sources_to_extract = active_sources(config)
@@ -82,10 +126,15 @@ def extract(source: str | None, extract_all: bool, dag_id: str | None, run_id: s
     for src_config in sources_to_extract:
         try:
             click.echo(f"Extracting from {src_config.name}...")
+            started = time.monotonic()
             source_id = get_source_id_by_name(src_config.name)
             scraper = ScraperFactory.create(src_config, source_id=source_id)
             extracted, skipped = scraper.extract(dag_id=dag_id, run_id=run_id)
-            click.echo(f"  ✓ Extracted {extracted} listings, skipped {skipped}")
+            elapsed = time.monotonic() - started
+            click.echo(
+                f"  ✓ Extracted {extracted} listings, skipped {skipped}; "
+                f"elapsed_seconds={elapsed:.1f}"
+            )
         except Exception as e:
             click.echo(f"  ✗ Error: {e}", err=True)
             raise SystemExit(1) from e

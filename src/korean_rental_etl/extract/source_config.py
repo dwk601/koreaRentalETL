@@ -97,6 +97,26 @@ def active_sources(config: SourcesConfig) -> list[SourceConfig]:
     return [s for s in config.sources if s.is_active]
 
 
+def registry_errors(
+    configured_active: set[str],
+    scraper_names: set[str],
+    parser_names: set[str],
+    database_active: set[str],
+) -> list[str]:
+    """Return concise errors when active source registries disagree."""
+    errors: list[str] = []
+    checks = (
+        ("missing scraper", configured_active - scraper_names),
+        ("missing parser", configured_active - parser_names),
+        ("missing from database", configured_active - database_active),
+        ("active only in database", database_active - configured_active),
+    )
+    for label, names in checks:
+        if names:
+            errors.append(f"{label}: {', '.join(sorted(names))}")
+    return errors
+
+
 def get_source(config: SourcesConfig, name: str) -> SourceConfig:
     """Get a source by name.
 

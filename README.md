@@ -734,23 +734,24 @@ The full schema definitions live in [`sql/migrations/001_initial_schema.sql`](sq
 
 ### Migrations
 
-Migrations are SQL files in `sql/migrations/` with numeric prefixes (e.g., `001_initial_schema.sql`, `002_fix_fts_index.sql`). They are applied automatically when the PostgreSQL container starts via the `docker-entrypoint-initdb.d` mechanism. To add a new migration:
+Migrations are SQL files in `sql/migrations/` with numeric prefixes. PostgreSQL applies them while initializing a new volume; the one-shot `app-migrate` service also applies each file once to existing volumes and records it in `public.schema_migrations`.
 
-1. Create `sql/migrations/NNN_description.sql` (increment NNN)
-2. Write idempotent SQL (use `IF NOT EXISTS`, `ON CONFLICT`, etc.)
-3. Commit and push
-4. On next `docker compose up`, the migration runs automatically
+1. Create `sql/migrations/NNN_description.sql` (increment NNN).
+2. Write idempotent SQL (`IF NOT EXISTS`, `ON CONFLICT`, etc.).
+3. Validate locally with `docker compose run --rm app-migrate` twice.
+4. Commit and deploy; `airflow-init` waits for `app-migrate` to succeed.
 
-For existing databases, manually run the migration:
+Check source registry alignment before a scrape with:
+
 ```bash
-docker compose exec postgres psql -U etl_user -d korean_rental -f /docker-entrypoint-initdb.d/NNN_description.sql
+korean-rental-etl sources check
 ```
 
 ### DAG schedules
 
 | DAG | Schedule | Tasks |
 |-----|----------|-------|
-| `korean_rental_full_etl` | Every 6 hours (0 */6 * * *) | health_check -> extract -> transform -> load -> validate -> notify |
+| `korean_rental_full_etl` | Every 6 hours (0 */6 * * *) | health_check -> source_preflight -> extract -> transform -> load -> validate -> optional notify |
 | `korean_rental_cleanup` | Daily at 03:00 UTC (0 3 * * *) | mark_stale_listings_inactive -> purge_old_raw_pages |
 
 ## License

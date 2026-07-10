@@ -167,6 +167,11 @@ class TestRadiokoreaScraper:
     def test_max_pages_is_3(self, scraper: RadiokoreaScraper) -> None:
         assert scraper.max_pages == 3
 
+    def test_uses_lightweight_fetcher_without_browser_solver_kwargs(self) -> None:
+        scraper = RadiokoreaScraper(source_id=5)
+        assert scraper.fetcher_type == "Fetcher"
+        assert scraper._fetch_kwargs == {}
+
     def test_pagination_stops_on_stale_row(
         self, scraper: RadiokoreaScraper, monkeypatch: pytest.MonkeyPatch
     ) -> None:
