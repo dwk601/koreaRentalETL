@@ -180,8 +180,8 @@ def run(
         source_name: Source name (e.g., 'svkoreans'). If None, processes all sources.
         source_id: Source ID. If None, looks up from source_name.
         limit: Max rows to process per source.
-        dag_id: Optional Airflow DAG ID.
-        run_id: Optional Airflow run ID string.
+        dag_id: Optional workflow ID retained in the audit schema.
+        run_id: Optional workflow run ID string.
 
     Returns:
         Tuple of (rows_parsed, rows_failed).

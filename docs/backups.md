@@ -3,7 +3,7 @@
 This guide outlines the production backup strategy, automated Coolify settings, offsite copying procedures, and a detailed step-by-step recovery guide for the `korean_rental` database.
 
 > [!IMPORTANT]
-> This guide only covers backing up the application database (`korean_rental`). The Airflow metadata database is treated as ephemeral; its schema is managed via migrations inside the containers, and it does not contain persistent business data.
+> This guide covers the application database (`korean_rental`). Scheduler state contains only reproducible run history and logs; the business output remains in PostgreSQL.
 
 ## Automated Backups via Coolify
 

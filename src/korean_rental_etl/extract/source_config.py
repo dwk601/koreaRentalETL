@@ -48,9 +48,8 @@ def _resolve_default_config_path() -> Path:
     Resolution order:
     1. KOREAN_RENTAL_ETL_CONFIG_PATH env var (explicit override).
     2. Repo-relative path (dev mode, when running from a checked-out tree).
-    3. /opt/airflow/project/config/sources.yml (baked-in production image).
-    4. Falls back to the dev-mode path so the FileNotFoundError below carries
-       a meaningful message.
+    3. Falls back to the dev-mode path so the FileNotFoundError below carries
+       a useful location.
     """
     env_path = os.environ.get("KOREAN_RENTAL_ETL_CONFIG_PATH")
     if env_path:
@@ -58,7 +57,6 @@ def _resolve_default_config_path() -> Path:
 
     candidates = [
         Path(__file__).parent.parent.parent.parent / "config" / "sources.yml",
-        Path("/opt/airflow/project/config/sources.yml"),
     ]
     for candidate in candidates:
         if candidate.exists():

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: etl_test
       POSTGRES_PASSWORD: test_password
     ports:
-      - "15432:5432"
+      - "${TEST_POSTGRES_PORT:-25432}:5432"
     volumes:
       - ./sql/migrations:/docker-entrypoint-initdb.d
     healthcheck:
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: korean_rental_redis_test
     ports:
-      - "16379:6379"
+      - "${TEST_REDIS_PORT:-26379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

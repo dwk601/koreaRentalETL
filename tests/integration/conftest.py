@@ -15,7 +15,7 @@ def setup_test_env():
     if "POSTGRES_HOST" not in os.environ:
         os.environ["POSTGRES_HOST"] = "localhost"
     if "POSTGRES_PORT" not in os.environ:
-        os.environ["POSTGRES_PORT"] = "15432"
+        os.environ["POSTGRES_PORT"] = "25432"
     if "POSTGRES_DB" not in os.environ:
         os.environ["POSTGRES_DB"] = "korean_rental_test"
     if "POSTGRES_USER" not in os.environ:

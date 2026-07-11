@@ -1,0 +1,2 @@
+0 */6 * * * etl-runner run korean_rental_full_etl
+0 3 * * * etl-runner run korean_rental_cleanup

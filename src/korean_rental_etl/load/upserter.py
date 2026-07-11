@@ -31,7 +31,9 @@ def upsert_batch(rows: list[dict[str, Any]], run_db_id: int) -> tuple[int, int, 
     loaded_staging_ids = []
 
     try:
-        with get_connection() as conn, conn.transaction(), conn.cursor() as cur:
+        # Psycopg pipeline batches protocol traffic while savepoints retain the
+        # existing per-row success/failure semantics.
+        with get_connection() as conn, conn.pipeline(), conn.transaction(), conn.cursor() as cur:
             for row in rows:
                 try:
                     with conn.transaction():
@@ -130,8 +132,8 @@ def load_from_staging(
 
     Args:
         source_id: Optional source filter.
-        dag_id: Airflow DAG ID.
-        run_id: Airflow run ID.
+        dag_id: Workflow ID retained in the existing audit schema.
+        run_id: Workflow run ID.
 
     Returns:
         Tuple of (rows_loaded, rows_failed).

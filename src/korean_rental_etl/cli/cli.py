@@ -90,8 +90,8 @@ def sources_check() -> None:
 @main.command()
 @click.option("--source", help="Source name to extract from")
 @click.option("--all", "extract_all", is_flag=True, help="Extract from all active sources")
-@click.option("--dag-id", help="Airflow DAG ID")
-@click.option("--run-id", help="Airflow run ID")
+@click.option("--dag-id", help="Workflow ID retained in the audit schema")
+@click.option("--run-id", help="Workflow run ID")
 def extract(source: str | None, extract_all: bool, dag_id: str | None, run_id: str | None) -> None:
     """Extract listings from sources."""
     from korean_rental_etl.extract.scraper_factory import ScraperFactory
@@ -144,8 +144,8 @@ def extract(source: str | None, extract_all: bool, dag_id: str | None, run_id: s
 @click.option("--source", help="Source name to transform")
 @click.option("--all", "transform_all", is_flag=True, help="Transform all active sources")
 @click.option("--limit", type=int, default=500, help="Max rows to process per source")
-@click.option("--dag-id", help="Airflow DAG ID")
-@click.option("--run-id", help="Airflow run ID")
+@click.option("--dag-id", help="Workflow ID retained in the audit schema")
+@click.option("--run-id", help="Workflow run ID")
 def transform(
     source: str | None,
     transform_all: bool,
@@ -180,8 +180,8 @@ def transform(
 
 @main.command()
 @click.option("--source", help="Source name to load")
-@click.option("--dag-id", help="Airflow DAG ID")
-@click.option("--run-id", help="Airflow run ID")
+@click.option("--dag-id", help="Workflow ID retained in the audit schema")
+@click.option("--run-id", help="Workflow run ID")
 def load(source: str | None, dag_id: str | None, run_id: str | None) -> None:
     """Load transformed listings into database."""
     from korean_rental_etl.load.upserter import load_from_staging
@@ -205,7 +205,7 @@ def load(source: str | None, dag_id: str | None, run_id: str | None) -> None:
 
 
 @main.command()
-@click.option("--run-id", help="ETL run ID (Airflow run ID string or numeric DB ID)")
+@click.option("--run-id", help="ETL run ID (workflow run ID string or numeric DB ID)")
 def validate(run_id: str | None) -> None:
     """Validate loaded listings."""
     if not run_id:
@@ -237,8 +237,8 @@ def validate(run_id: str | None) -> None:
 
 
 @main.command("run-all")
-@click.option("--dag-id", help="Airflow DAG ID")
-@click.option("--run-id", help="Airflow run ID")
+@click.option("--dag-id", help="Workflow ID retained in the audit schema")
+@click.option("--run-id", help="Workflow run ID")
 @click.pass_context
 def run_all(ctx: click.Context, dag_id: str | None, run_id: str | None) -> None:
     """Run full ETL pipeline (extract -> transform -> load -> validate)."""

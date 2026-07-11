@@ -20,9 +20,9 @@ def start_run(
     """Start a new ETL run record.
 
     Args:
-        dag_id: Airflow DAG ID.
-        task_id: Airflow task ID.
-        run_id: Airflow run ID.
+        dag_id: Workflow ID retained in the existing audit schema.
+        task_id: Workflow task ID.
+        run_id: Workflow run ID.
         source_name: Source being processed.
 
     Returns:
