@@ -57,6 +57,7 @@ def _resolve_default_config_path() -> Path:
 
     candidates = [
         Path(__file__).parent.parent.parent.parent / "config" / "sources.yml",
+        Path("/app/config/sources.yml"),
     ]
     for candidate in candidates:
         if candidate.exists():
